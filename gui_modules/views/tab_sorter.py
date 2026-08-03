@@ -352,7 +352,7 @@ def setup_organizer_tab(gui_instance):
     gui_instance.scan_btn.grid(row=0, column=3, sticky="e")
 
     tree_frame = ctk.CTkFrame(preview_card, corner_radius=8, fg_color=("gray95", "gray15"))
-    tree_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))
+    tree_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 4))
     tree_frame.grid_columnconfigure(0, weight=1)
 
     columns = ("filename", "rel_src", "rel_target", "category", "size_str", "status")
@@ -376,9 +376,10 @@ def setup_organizer_tab(gui_instance):
     gui_instance.tree.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
     scrollbar.grid(row=0, column=1, sticky="ns", pady=4)
 
-    # Zero-Deletion Guarantee Banner
-    guarantee_card = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("#e8f5e9", "#1b3320"), border_color="#388e3c", border_width=1)
-    guarantee_card.grid(row=4, column=0, sticky="ew", pady=(0, 6), ipadx=8, ipady=4)
+    # Zero-Deletion Guarantee Banner — placed inside preview_card at row=2,
+    # fully below the Treeview (row=1) with explicit top padding for a clean gap.
+    guarantee_card = ctk.CTkFrame(preview_card, corner_radius=10, fg_color=("#e8f5e9", "#1b3320"), border_color="#388e3c", border_width=1)
+    guarantee_card.grid(row=2, column=0, sticky="ew", padx=12, pady=(4, 8), ipadx=8, ipady=4)
 
     ctk.CTkLabel(
         guarantee_card,
