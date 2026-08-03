@@ -125,11 +125,22 @@ if HAS_CUSTOMTKINTER:
                 ctk.CTkLabel(bar_row, text=f"{count} ({pct:.1f}%)", font=ctk.CTkFont(size=10), text_color="gray60", width=80, anchor="e").grid(row=0, column=2, sticky="e")
                 row += 1
 
-    class ModernFileDateSorterGUI(ctk.CTk):
-        def __init__(self):
-            super().__init__()
+            try:
+                from version import APP_NAME, VERSION
+            except ImportError:
+                APP_NAME = "Smart File Organizer Suite"
+                VERSION = "1.0.0"
 
-            self.title("Smart File Organizer Suite Pro v4.0 (Windows 11 Edition)")
+            self.title(f"{APP_NAME} v{VERSION}")
+
+            # Apply Window Icon (.ico / .png)
+            base_path = getattr(sys, '_MEIPASS', os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+            icon_ico = os.path.join(base_path, "assets", "icon.ico")
+            if os.path.exists(icon_ico):
+                try:
+                    self.iconbitmap(icon_ico)
+                except Exception:
+                    pass
 
             # Responsive Screen-Optimized Window Geometry & Centered Placement
             screen_w = self.winfo_screenwidth()

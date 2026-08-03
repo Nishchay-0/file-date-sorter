@@ -1,6 +1,12 @@
 import argparse
 import sys
 import os
+try:
+    from version import APP_NAME, VERSION
+except ImportError:
+    APP_NAME = "Smart File Organizer Suite"
+    VERSION = "1.0.0"
+
 from sorter_core import (
     organize_directory,
     list_manifest_files,
@@ -13,7 +19,14 @@ def print_progress(current, total, file_path, status_msg, status_tag):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Smart File Organizer & Sorter - Automatically organize files by Date, Extension, File Type, Alphabetical Name, or Size."
+        description=f"{APP_NAME} - Automatically organize files by Date, Extension, File Type, Alphabetical Name, or Size."
+    )
+
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"{APP_NAME} v{VERSION}",
+        help="Show program version and exit."
     )
 
     parser.add_argument(

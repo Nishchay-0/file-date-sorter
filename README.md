@@ -1,4 +1,7 @@
-# ⚡ Smart File Organizer & Sorter Suite
+# ⚡ Smart File Organizer Suite
+
+[![CI Status](https://github.com/Nishchay-0/file-date-sorter/actions/workflows/ci.yml/badge.svg)](https://github.com/Nishchay-0/file-date-sorter/actions/workflows/ci.yml)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 
 A powerful, modern desktop application and command-line utility for organizing, extracting, deduplicating, renaming, and cleaning files across nested directory trees.
 
@@ -16,6 +19,30 @@ A powerful, modern desktop application and command-line utility for organizing, 
 8. **📊 Storage Analytics Dashboard**: Visual category size breakdowns, date range span, and top subfolder disk usage.
 9. **🚫 Unified Path Exclusion Engine**: Skip specific folders (`.git`, `node_modules`, `_Duplicates`), custom directories (picked via **"Except Folder..."**), file names, or extensions across all tools.
 10. **🛡️ System Vault Backup & 1-Click Undo**: Preview operations with Dry-Run mode, generate System Vault Zip backups, and restore any operation using 1-click undo manifests.
+
+---
+
+## 📦 Building Executable & Installer
+
+### 1. Build Standalone Executable
+Build `SmartFileOrganizer.exe` using PyInstaller:
+```bash
+python build_exe.py
+```
+Output directory: `dist/SmartFileOrganizer/`
+
+### 2. Compile Windows Installer (.exe)
+Package the standalone folder into a setup wizard using [Inno Setup](https://jrsoftware.org/isinfo.php):
+```cmd
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+```
+Output installer: `installer_output/SmartFileOrganizer_Setup_v1.0.0.exe`
+
+### 🔐 Code-Signing & SmartScreen Warning Removal
+When distributing Windows applications, Windows SmartScreen may flag unsigned binaries as "unrecognized publisher". To eliminate SmartScreen warnings:
+1. Obtain an EV/OV Code Signing Certificate (`.pfx`).
+2. Set environment variables `CODE_SIGNING_CERT_PATH` and `CODE_SIGNING_CERT_PASS`.
+3. Run `python build_exe.py` (which automatically invokes `signtool sign` via the integrated code-signing hook).
 
 ---
 
