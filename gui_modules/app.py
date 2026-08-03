@@ -127,6 +127,10 @@ if HAS_CUSTOMTKINTER:
                 ctk.CTkLabel(bar_row, text=f"{count} ({pct:.1f}%)", font=ctk.CTkFont(size=10), text_color="gray60", width=80, anchor="e").grid(row=0, column=2, sticky="e")
                 row += 1
 
+    class ModernFileDateSorterGUI(ctk.CTk):
+        def __init__(self):
+            super().__init__()
+
             try:
                 from version import APP_NAME, VERSION
             except ImportError:
