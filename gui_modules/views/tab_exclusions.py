@@ -13,6 +13,7 @@ def setup_exclusions_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_exclusions, fg_color="transparent")
     scroll.pack(fill="both", expand=True)
     scroll.grid_columnconfigure(0, weight=1)
+    gui_instance.exclusions_scroll = scroll
 
     # Header Card
     hdr_card = ctk.CTkFrame(scroll, corner_radius=12)

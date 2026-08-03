@@ -280,8 +280,11 @@ if HAS_CUSTOMTKINTER:
 
                 if target:
                     try:
-                        target.yview_scroll(scroll_units, "units")
-                        return "break"
+                        if hasattr(target, 'winfo_exists') and not target.winfo_exists():
+                            target = None
+                        else:
+                            target.yview_scroll(scroll_units, "units")
+                            return "break"
                     except Exception:
                         pass
 
@@ -297,7 +300,7 @@ if HAS_CUSTOMTKINTER:
             Fast universal mousewheel scrolling engine.
             - Monkey-patches CTkScrollableFrame._mouse_wheel_all to a no-op so the
               built-in slow (delta/6) handler is disabled completely.
-            - Our engine uses delta/2 = ~60 units per notch for Windows Explorer speed.
+            - Our engine uses smooth 3-unit steps per notch for Windows & Linux UI consistency.
             - Works anywhere in the window: cards, buttons, labels, images, margins.
             """
             import sys as _sys
@@ -317,12 +320,15 @@ if HAS_CUSTOMTKINTER:
 
                 scroll_units = 0
                 if getattr(event, 'num', None) == 4:
-                    scroll_units = -40
+                    scroll_units = -3
                 elif getattr(event, 'num', None) == 5:
-                    scroll_units = 40
+                    scroll_units = 3
                 elif getattr(event, 'delta', 0):
-                    # delta/2 gives ~60 units per notch — Windows Explorer feel
-                    scroll_units = -int(event.delta / 2)
+                    d = event.delta
+                    if abs(d) >= 120:
+                        scroll_units = int(-1 * (d / 120) * 3)
+                    else:
+                        scroll_units = -2 if d > 0 else (2 if d < 0 else 0)
 
                 if scroll_units == 0:
                     return
@@ -373,15 +379,15 @@ if HAS_CUSTOMTKINTER:
                     try:
                         active_tab = self.tabview.get() if hasattr(self, 'tabview') else None
                         tab_attr_map = {
-                            "👯 Duplicate Conflicts": "dup_main_scroll",
+                            "🔍 Duplicates Finder": "dup_main_scroll",
                             "📅 File Organizer": "organizer_scroll",
-                            "🧹 Cleaner": "cleaner_scroll",
-                            "📦 Extractor": "extractor_scroll",
-                            "✏️ Batch Renamer": "renamer_scroll",
-                            "🔄 File Converter": "converter_scroll",
+                            "🧹 Storage Cleaner": "cleaner_scroll",
+                            "📦 Subfolder Extractor": "extractor_scroll",
+                            "🏷️ Bulk Renamer": "renamer_scroll",
+                            "🪄 Magic Converter": "converter_scroll",
                             "🚫 Exclusions": "exclusions_scroll",
-                            "📊 Storage Insights": "insights_scroll",
-                            "👀 Folder Watcher": "watcher_scroll"
+                            "📊 Analytics": "insights_scroll",
+                            "👁️ Auto Watcher": "watcher_scroll"
                         }
                         attr_name = tab_attr_map.get(active_tab)
                         if attr_name:
@@ -390,7 +396,7 @@ if HAS_CUSTOMTKINTER:
                                 target = getattr(f_obj, '_parent_canvas')
 
                         if not target:
-                            for attr in ('dup_main_scroll', 'organizer_scroll', 'cleaner_scroll', 'extractor_scroll', 'renamer_scroll', 'converter_scroll', 'exclusions_scroll', 'insights_scroll', 'watcher_scroll'):
+                            for attr in ('organizer_scroll', 'dup_main_scroll', 'cleaner_scroll', 'extractor_scroll', 'renamer_scroll', 'converter_scroll', 'exclusions_scroll', 'insights_scroll', 'watcher_scroll'):
                                 f_obj = getattr(self, attr, None)
                                 if f_obj and hasattr(f_obj, '_parent_canvas') and getattr(f_obj, '_parent_canvas', None):
                                     target = getattr(f_obj, '_parent_canvas')
@@ -400,8 +406,11 @@ if HAS_CUSTOMTKINTER:
 
                 if target:
                     try:
-                        target.yview_scroll(scroll_units, "units")
-                        return "break"
+                        if hasattr(target, 'winfo_exists') and not target.winfo_exists():
+                            target = None
+                        else:
+                            target.yview_scroll(scroll_units, "units")
+                            return "break"
                     except Exception:
                         pass
 
@@ -416,7 +425,9 @@ if HAS_CUSTOMTKINTER:
             """
             Ensures container_widget delegates mousewheel scrolling to the global master scroll engine.
             """
-            pass
+            if not container_widget:
+                return
+            self.bind_mousewheel_to_widget(container_widget)
 
         def dup_log(self, message, tag="info"):
             """Streams color-coded live execution logs into the Duplicate tab's real-time log console."""

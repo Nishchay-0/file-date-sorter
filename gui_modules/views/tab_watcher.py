@@ -12,6 +12,7 @@ def setup_watcher_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_watcher, fg_color="transparent")
     scroll.pack(fill="both", expand=True)
     scroll.grid_columnconfigure(0, weight=1)
+    gui_instance.watcher_scroll = scroll
 
     wtc_card = ctk.CTkFrame(scroll, corner_radius=12)
     wtc_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)

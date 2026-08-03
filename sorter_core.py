@@ -219,7 +219,7 @@ def calculate_text_similarity(filepath1, filepath2, max_bytes=100000):
         return 0.0
 
 
-def extract_date_from_filename(filename):
+def extract_date_from_filename(filename, date_format_preference='DMY'):
     """
     Parses datetime embedded in filename.
     Supports formats:
@@ -230,6 +230,11 @@ def extract_date_from_filename(filename):
       - Screenshots / Camera: Screenshot_YYYYMMDD..., IMG_YYYYMMDD...
       - Year-Month: YYYY-MM, YYYY_MM
       - 4-digit Year: 1970..2099
+
+    Tie-breaking rule for ambiguous 8-digit non-YYYY dates (e.g. 01022023):
+      - If date_format_preference='DMY' (default), attempts DDMMYYYY first (01022023 -> Feb 1, 2023).
+      - If date_format_preference='MDY', attempts MMDDYYYY first (01022023 -> Jan 2, 2023).
+
     Returns datetime object or None if no valid date found.
     """
     import re
@@ -253,7 +258,13 @@ def extract_date_from_filename(filename):
         except ValueError:
             pass
 
-    # Pattern 3: 8 contiguous digits (e.g. 20022022, 20220220, 20210815)
+    # Pattern 3: 8 contiguous digits (e.g. 20022022, 20220220, 20210815, 01022023)
+    pref = str(date_format_preference).upper()
+    if pref.startswith('M'):
+        formats = ['MMDDYYYY', 'DDMMYYYY']
+    else:
+        formats = ['DDMMYYYY', 'MMDDYYYY']
+
     for m8 in re.finditer(r'(?<!\d)(\d{8})(?!\d)', base):
         s = m8.group(1)
 
@@ -266,23 +277,23 @@ def extract_date_from_filename(filename):
             except ValueError:
                 pass
 
-        # Try DDMMYYYY next (e.g. 20022022 -> DD=20, MM=02, YYYY=2022)
+        # Try DDMMYYYY / MMDDYYYY according to tie-breaking preference
         if s.endswith(('19', '20')) or s[4:6] in ('19', '20'):
-            try:
-                d, m, y = int(s[0:2]), int(s[2:4]), int(s[4:8])
-                if 1970 <= y <= 2099 and 1 <= m <= 12 and 1 <= d <= 31:
-                    return datetime(y, m, d)
-            except ValueError:
-                pass
-
-        # Try MMDDYYYY next (e.g. 02202022 -> MM=02, DD=20, YYYY=2022)
-        if s.endswith(('19', '20')) or s[4:6] in ('19', '20'):
-            try:
-                m, d, y = int(s[0:2]), int(s[2:4]), int(s[4:8])
-                if 1970 <= y <= 2099 and 1 <= m <= 12 and 1 <= d <= 31:
-                    return datetime(y, m, d)
-            except ValueError:
-                pass
+            for fmt in formats:
+                if fmt == 'DDMMYYYY':
+                    try:
+                        d, m, y = int(s[0:2]), int(s[2:4]), int(s[4:8])
+                        if 1970 <= y <= 2099 and 1 <= m <= 12 and 1 <= d <= 31:
+                            return datetime(y, m, d)
+                    except ValueError:
+                        pass
+                elif fmt == 'MMDDYYYY':
+                    try:
+                        m, d, y = int(s[0:2]), int(s[2:4]), int(s[4:8])
+                        if 1970 <= y <= 2099 and 1 <= m <= 12 and 1 <= d <= 31:
+                            return datetime(y, m, d)
+                    except ValueError:
+                        pass
 
     # Pattern 4: Year-Month YYYYMM or YYYY-MM (6 digits, e.g. 202202)
     m6 = re.search(r'(?<!\d)(19[7-9]\d|20[0-9]\d)[-._]?(0[1-9]|1[0-2])(?!\d)', base)
@@ -344,7 +355,7 @@ def sync_file_timestamps_from_filename(filepath):
         return False
 
 
-def get_file_date(filepath, date_source='ctime'):
+def get_file_date(filepath, date_source='ctime', date_format_preference='DMY'):
     """
     Extracts datetime from a file using specified date source priority.
     date_source options:
@@ -360,7 +371,7 @@ def get_file_date(filepath, date_source='ctime'):
 
     # 1. Check Filename Embedded Date if 'smart', 'filename', or '🔤' requested
     if any(k in ds_lower for k in ['smart', 'filename', '🔤', '📅', 'auto']):
-        dt = extract_date_from_filename(filename)
+        dt = extract_date_from_filename(filename, date_format_preference=date_format_preference)
 
     # 2. Check EXIF camera metadata if dt is still None and ('exif', 'smart', 'auto') requested
     if dt is None and any(k in ds_lower for k in ['exif', 'smart', 'auto', '📅']):
@@ -396,7 +407,7 @@ def get_file_date(filepath, date_source='ctime'):
 
     # 4. Corrupt OS Timestamp Guard: If dt year is unreasonably old (< 1990 or > 2099) and filename contains a valid date, override with filename date!
     if dt and (dt.year < 1990 or dt.year > 2099):
-        fn_dt = extract_date_from_filename(filename)
+        fn_dt = extract_date_from_filename(filename, date_format_preference=date_format_preference)
         if fn_dt:
             dt = fn_dt
 

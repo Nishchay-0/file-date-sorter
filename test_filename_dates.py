@@ -73,7 +73,18 @@ def run_tests():
         mtime = datetime.fromtimestamp(os.path.getmtime(expected_dest_file))
         assert mtime.year == 2022
         print(f"  [+] On-Disk File System mtime updated to: {mtime.strftime('%Y-%m-%d')}")
-        print("  [OK] TEST 4 PASSED: Disk Timestamps Successfully Synced to 2022")
+        # --- TEST 5: Ambiguous 8-Digit Date Tie-Breaking Rule ---
+        print("\n--- TEST 5: Ambiguous 8-Digit Date Tie-Breaking Rule ---")
+        ambiguous_fname = "01022023_document.pdf"
+        parsed_dmy = extract_date_from_filename(ambiguous_fname, date_format_preference='DMY')
+        parsed_mdy = extract_date_from_filename(ambiguous_fname, date_format_preference='MDY')
+
+        print(f"  [+] '01022023' with preference 'DMY' -> Parsed: {parsed_dmy.strftime('%Y-%m-%d')}")
+        print(f"  [+] '01022023' with preference 'MDY' -> Parsed: {parsed_mdy.strftime('%Y-%m-%d')}")
+
+        assert parsed_dmy == datetime(2023, 2, 1), f"Expected 2023-02-01 under DMY, got {parsed_dmy}"
+        assert parsed_mdy == datetime(2023, 1, 2), f"Expected 2023-01-02 under MDY, got {parsed_mdy}"
+        print("  [OK] TEST 5 PASSED: Ambiguous date '01022023' correctly resolved under both DMY and MDY preferences!")
 
     finally:
         shutil.rmtree(test_dir, ignore_errors=True)
