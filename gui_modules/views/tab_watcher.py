@@ -21,7 +21,7 @@ def setup_watcher_tab(gui_instance):
     hdr_w = ctk.CTkFrame(wtc_card, fg_color="transparent")
     hdr_w.grid(row=0, column=0, columnspan=3, sticky="w", padx=12, pady=(6, 4))
     ctk.CTkLabel(hdr_w, text="👁️ Automated Download Folder Watcher Service", font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold")).pack(side="left")
-    create_info_icon(hdr_w, "Background service that monitors your Downloads folder and automatically organizes newly downloaded files instantly!").pack(side="left", padx=6)
+    create_info_icon(hdr_w, "Background service that monitors your Downloads/Target folder and automatically organizes newly dropped files instantly!").pack(side="left", padx=6)
 
     ctk.CTkLabel(wtc_card, text="Folder to Watch:", font=ctk.CTkFont(size=11, weight="bold")).grid(row=1, column=0, sticky="w", padx=(12, 6), pady=4)
 
@@ -33,8 +33,6 @@ def setup_watcher_tab(gui_instance):
     wtc_btn_box.grid(row=1, column=2, sticky="e", padx=(0, 12), pady=4)
 
     ctk.CTkButton(wtc_btn_box, text="📁 Pick Folder...", command=gui_instance.browse_wtc_folder, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=95).pack(side="left", padx=(0, 3))
-    ctk.CTkButton(wtc_btn_box, text="📁+ Multi Folders...", command=lambda: gui_instance.browse_multiple_folders(gui_instance.wtc_dir_var), font=ctk.CTkFont(size=10, weight="bold"), fg_color="#1565c0", height=32, width=110).pack(side="left", padx=(0, 3))
-
     ctk.CTkButton(
         wtc_btn_box,
         text="📥 Downloads",
@@ -46,29 +44,52 @@ def setup_watcher_tab(gui_instance):
         width=95
     ).pack(side="left")
 
-    gui_instance.wtc_status_lbl = ctk.CTkLabel(wtc_card, text="Status: 🔴 Service Stopped", font=ctk.CTkFont(size=12, weight="bold"), text_color="#e57373")
-    gui_instance.wtc_status_lbl.grid(row=2, column=0, columnspan=2, sticky="w", padx=12, pady=6)
+    # Options Row: Sort Rule & Debounce Window
+    opts_card = ctk.CTkFrame(wtc_card, fg_color=("gray92", "gray20"), corner_radius=8)
+    opts_card.grid(row=2, column=0, columnspan=3, sticky="ew", padx=12, pady=6, ipadx=6, ipady=4)
 
-    btn_box = ctk.CTkFrame(wtc_card, fg_color="transparent")
-    btn_box.grid(row=3, column=0, columnspan=3, sticky="w", padx=12, pady=(4, 6))
+    ctk.CTkLabel(opts_card, text="Sort Criteria:", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(8, 4))
+    gui_instance.wtc_sort_category_var = ctk.StringVar(value="date")
+    ctk.CTkOptionMenu(
+        opts_card,
+        variable=gui_instance.wtc_sort_category_var,
+        values=["date", "category", "extension", "name", "size"],
+        font=ctk.CTkFont(size=11),
+        width=130
+    ).pack(side="left", padx=(0, 16))
 
-    gui_instance.wtc_start_btn = ctk.CTkButton(
-        btn_box,
-        text="▶ Start Folder Watcher",
-        command=gui_instance.start_watcher_service,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        fg_color="#1b5e20",
-        height=34
+    ctk.CTkLabel(opts_card, text="Debounce Window:", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(0, 4))
+    gui_instance.wtc_debounce_var = tk.StringVar(value="3.0")
+    ctk.CTkEntry(opts_card, textvariable=gui_instance.wtc_debounce_var, width=50, font=ctk.CTkFont(size=11)).pack(side="left", padx=(0, 4))
+    ctk.CTkLabel(opts_card, text="seconds", font=ctk.CTkFont(size=11), text_color="gray60").pack(side="left", padx=(0, 12))
+
+    # Controls Row: Switch & Status
+    ctrl_row = ctk.CTkFrame(wtc_card, fg_color="transparent")
+    ctrl_row.grid(row=3, column=0, columnspan=3, sticky="ew", padx=12, pady=(4, 6))
+
+    gui_instance.wtc_switch_var = tk.BooleanVar(value=False)
+    gui_instance.wtc_switch = ctk.CTkSwitch(
+        ctrl_row,
+        text="Watch this folder (Background Auto-Organize)",
+        variable=gui_instance.wtc_switch_var,
+        command=gui_instance.toggle_watcher_switch,
+        font=ctk.CTkFont(size=12, weight="bold"),
+        progress_color="#2e7d32"
     )
-    gui_instance.wtc_start_btn.pack(side="left", padx=(0, 8))
+    gui_instance.wtc_switch.pack(side="left", padx=(0, 16))
 
-    gui_instance.wtc_stop_btn = ctk.CTkButton(
-        btn_box,
-        text="⏹ Stop Service",
-        command=gui_instance.stop_watcher_service,
-        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        fg_color="#c62828",
-        height=34,
-        state="disabled"
-    )
-    gui_instance.wtc_stop_btn.pack(side="left")
+    gui_instance.wtc_status_lbl = ctk.CTkLabel(ctrl_row, text="Status: 🔴 Service Stopped", font=ctk.CTkFont(size=12, weight="bold"), text_color="#e57373")
+    gui_instance.wtc_status_lbl.pack(side="left", padx=8)
+
+    # Session Stats Card
+    stats_card = ctk.CTkFrame(scroll, corner_radius=12)
+    stats_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
+    stats_card.grid_columnconfigure(1, weight=1)
+
+    ctk.CTkLabel(stats_card, text="📊 Live Watcher Session Statistics", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(6, 4))
+
+    gui_instance.wtc_stats_files_lbl = ctk.CTkLabel(stats_card, text="Files Auto-Organized This Session: 0", font=ctk.CTkFont(size=11, weight="bold"), text_color="#81c784")
+    gui_instance.wtc_stats_files_lbl.grid(row=1, column=0, sticky="w", padx=12, pady=2)
+
+    gui_instance.wtc_stats_active_folder_lbl = ctk.CTkLabel(stats_card, text="Watched Target Folder: None", font=ctk.CTkFont(size=11), text_color="gray70")
+    gui_instance.wtc_stats_active_folder_lbl.grid(row=2, column=0, sticky="w", padx=12, pady=2)

@@ -112,8 +112,49 @@ def main():
         const="LATEST",
         help="Undo a previous sort operation using manifest file path or 'LATEST'."
     )
+    parser.add_argument(
+        "-w", "--watch",
+        action="store_true",
+        help="Run in continuous background folder watcher mode."
+    )
+    parser.add_argument(
+        "--debounce",
+        type=float,
+        default=3.0,
+        help="Debounce window in seconds for watcher mode (default: 3.0)."
+    )
 
     args = parser.parse_args()
+
+    # Handle Headless Watcher Mode
+    if args.watch:
+        if not args.path:
+            print("Error: Please provide --path <folder_path> to watch.")
+            sys.exit(1)
+        import time
+        from datetime import datetime
+        from watcher_service import FolderWatcherService
+
+        watcher = FolderWatcherService(callback_notify=lambda msg: print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"))
+        target_dir = os.path.abspath(args.path)
+        print(f"=== STARTING HEADLESS AUTO WATCHER FOR '{target_dir}' ===")
+        print(f"Sort Category: {args.sort_category.upper()} | Debounce: {args.debounce}s")
+        print("Press Ctrl+C to stop watching.\n")
+
+        watcher.start_watching(
+            folder_path=target_dir,
+            sort_category=args.sort_category,
+            date_source=args.date_source,
+            structure_format=args.format,
+            debounce_seconds=args.debounce
+        )
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nStopping Auto Watcher service...")
+            watcher.stop_watching()
+            sys.exit(0)
 
     # Handle Clean Empty Only Mode
     if args.clean_empty_only:
@@ -149,12 +190,6 @@ def main():
         except Exception as e:
             print(f"Undo error: {e}")
             sys.exit(1)
-
-    # Require path for sorting if not undoing
-    if not args.path:
-        parser.print_help()
-        print("\nError: Please provide --path <folder_path> or --undo")
-        sys.exit(1)
 
     target_dir = os.path.abspath(args.path)
 

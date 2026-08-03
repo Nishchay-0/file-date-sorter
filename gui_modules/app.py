@@ -13,6 +13,8 @@ import time
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from watcher_service import FolderWatcherService
+from settings_manager import load_settings, save_settings
 
 from gui_modules.components import (
     CTkToolTip,
@@ -723,6 +725,77 @@ if HAS_CUSTOMTKINTER:
             elif "Exclusions" in current and not self._tabs_loaded["exclusions"]:
                 setup_exclusions_tab(self)
                 self._tabs_loaded["exclusions"] = True
+
+        def _on_watcher_notify(self, message):
+            if hasattr(self, 'dup_log'):
+                self.dup_log(message, tag="info")
+            if hasattr(self, 'status_var'):
+                self.status_var.set(message)
+            self._update_watcher_stats_ui()
+
+        def browse_wtc_folder(self):
+            folder = filedialog.askdirectory(title="Select Folder to Watch")
+            if folder:
+                if hasattr(self, 'wtc_dir_var'):
+                    self.wtc_dir_var.set(folder)
+
+        def toggle_watcher_switch(self):
+            if getattr(self, 'wtc_switch_var', tk.BooleanVar()).get():
+                self.start_watcher_service()
+            else:
+                self.stop_watcher_service()
+
+        def start_watcher_service(self):
+            folder = getattr(self, 'wtc_dir_var', tk.StringVar()).get().strip()
+            if not folder or not os.path.exists(folder):
+                messagebox.showerror("Error", "Please select a valid folder to watch.")
+                if hasattr(self, 'wtc_switch_var'):
+                    self.wtc_switch_var.set(False)
+                return
+
+            cat = getattr(self, 'wtc_sort_category_var', ctk.StringVar()).get()
+            try:
+                deb = float(getattr(self, 'wtc_debounce_var', tk.StringVar()).get())
+            except ValueError:
+                deb = 3.0
+
+            try:
+                if not self.watcher_service:
+                    self.watcher_service = FolderWatcherService(callback_notify=self._on_watcher_notify)
+
+                self.watcher_service.start_watching(
+                    folder_path=folder,
+                    sort_category=cat,
+                    date_source="ctime",
+                    structure_format="YYYY/MM",
+                    debounce_seconds=deb
+                )
+                if hasattr(self, 'wtc_status_lbl') and self.wtc_status_lbl:
+                    self.wtc_status_lbl.configure(text=f"Status: 🟢 Active Watching '{os.path.basename(folder)}'", text_color="#81c784")
+                if hasattr(self, 'wtc_switch_var'):
+                    self.wtc_switch_var.set(True)
+                self._update_watcher_stats_ui()
+            except Exception as ex:
+                messagebox.showerror("Watcher Error", f"Failed to start folder watcher: {ex}")
+                if hasattr(self, 'wtc_switch_var'):
+                    self.wtc_switch_var.set(False)
+
+        def stop_watcher_service(self):
+            if self.watcher_service:
+                self.watcher_service.stop_watching()
+            if hasattr(self, 'wtc_status_lbl') and self.wtc_status_lbl:
+                self.wtc_status_lbl.configure(text="Status: 🔴 Service Stopped", text_color="#e57373")
+            if hasattr(self, 'wtc_switch_var'):
+                self.wtc_switch_var.set(False)
+            self._update_watcher_stats_ui()
+
+        def _update_watcher_stats_ui(self):
+            if not hasattr(self, 'wtc_stats_files_lbl') or not self.wtc_stats_files_lbl:
+                return
+            count = self.watcher_service.files_organized_count if self.watcher_service else 0
+            folder = self.watcher_service.watched_folder if (self.watcher_service and self.watcher_service.is_running) else "None"
+            self.wtc_stats_files_lbl.configure(text=f"Files Auto-Organized This Session: {count}")
+            self.wtc_stats_active_folder_lbl.configure(text=f"Watched Target Folder: {folder}")
 
         def populate_tree_in_chunks(self, tree, rows, chunk_size=300, current_idx=0):
             """Inserts treeview rows in non-blocking UI chunks to prevent freezing with large datasets."""
