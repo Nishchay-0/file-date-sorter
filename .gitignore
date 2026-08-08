@@ -12,7 +12,9 @@ env/
 # Build & Dist
 build/
 dist/
+installer_output/
 *.spec
+*.exe
 
 # IDEs & System files
 .vscode/

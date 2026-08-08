@@ -163,7 +163,7 @@ def run_super_duplicate_tests():
 
     finally:
         if os.path.exists(test_dir):
-            shutil.rmtree(test_dir)
+            shutil.rmtree(test_dir, ignore_errors=True)
 
     print("\nALL SUPER DUPLICATE & SIMILAR FILES TESTS PASSED PERFECTLY!")
 
