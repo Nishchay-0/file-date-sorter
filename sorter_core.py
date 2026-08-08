@@ -14,6 +14,14 @@ import difflib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+from hashing import (
+    get_file_hash,
+    get_file_fast_hash,
+    get_image_perceptual_hash,
+    calculate_hamming_similarity,
+    calculate_fuzzy_name_similarity
+)
+
 try:
     from PIL import Image
     from PIL.ExifTags import TAGS

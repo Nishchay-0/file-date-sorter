@@ -33,6 +33,7 @@ from gui_modules.views.tab_cleaner import setup_cleaner_tab
 from gui_modules.views.tab_analytics import setup_insights_tab
 from gui_modules.views.tab_watcher import setup_watcher_tab
 from gui_modules.views.tab_exclusions import setup_exclusions_tab
+from gui_modules.views.tab_people import setup_people_tab
 
 from sorter_core import (
     organize_directory,
@@ -229,7 +230,8 @@ if HAS_CUSTOMTKINTER:
                 "cleaner": False,
                 "insights": False,
                 "watcher": False,
-                "exclusions": False
+                "exclusions": False,
+                "people": False
             }
 
             self.setup_ui()
@@ -396,6 +398,7 @@ if HAS_CUSTOMTKINTER:
                     try:
                         active_tab = self.tabview.get() if hasattr(self, 'tabview') else None
                         tab_attr_map = {
+                            "👥 People Sorter": "people_scroll",
                             "🔍 Duplicates Finder": "dup_main_scroll",
                             "📅 File Organizer": "organizer_scroll",
                             "🧹 Storage Cleaner": "cleaner_scroll",
@@ -413,7 +416,7 @@ if HAS_CUSTOMTKINTER:
                                 target = getattr(f_obj, '_parent_canvas')
 
                         if not target:
-                            for attr in ('organizer_scroll', 'dup_main_scroll', 'cleaner_scroll', 'extractor_scroll', 'renamer_scroll', 'converter_scroll', 'exclusions_scroll', 'insights_scroll', 'watcher_scroll'):
+                            for attr in ('people_scroll', 'organizer_scroll', 'dup_main_scroll', 'cleaner_scroll', 'extractor_scroll', 'renamer_scroll', 'converter_scroll', 'exclusions_scroll', 'insights_scroll', 'watcher_scroll'):
                                 f_obj = getattr(self, attr, None)
                                 if f_obj and hasattr(f_obj, '_parent_canvas') and getattr(f_obj, '_parent_canvas', None):
                                     target = getattr(f_obj, '_parent_canvas')
@@ -427,14 +430,25 @@ if HAS_CUSTOMTKINTER:
                             target = None
                         else:
                             target.yview_scroll(scroll_units, "units")
+                            try:
+                                target.update_idletasks()
+                            except Exception:
+                                pass
                             return "break"
                     except Exception:
                         pass
 
             try:
-                self.bind_all("<MouseWheel>", _on_global_mousewheel, add="+")
-                self.bind_all("<Button-4>", _on_global_mousewheel, add="+")
-                self.bind_all("<Button-5>", _on_global_mousewheel, add="+")
+                self.unbind_all("<MouseWheel>")
+                self.unbind_all("<Button-4>")
+                self.unbind_all("<Button-5>")
+            except Exception:
+                pass
+
+            try:
+                self.bind_all("<MouseWheel>", _on_global_mousewheel)
+                self.bind_all("<Button-4>", _on_global_mousewheel)
+                self.bind_all("<Button-5>", _on_global_mousewheel)
             except Exception:
                 pass
 
@@ -666,6 +680,7 @@ if HAS_CUSTOMTKINTER:
 
             self.tab_organizer = self.tabview.add("📅 File Organizer")
             self.tab_duplicates = self.tabview.add("🔍 Duplicates Finder")
+            self.tab_people = self.tabview.add("👥 People Sorter")
             self.tab_extractor = self.tabview.add("📦 Subfolder Extractor")
             self.tab_converter = self.tabview.add("🪄 Magic Converter")
             self.tab_renamer = self.tabview.add("🏷️ Bulk Renamer")
@@ -708,6 +723,9 @@ if HAS_CUSTOMTKINTER:
             elif "Duplicates" in current and not self._tabs_loaded["duplicates"]:
                 setup_duplicates_tab(self)
                 self._tabs_loaded["duplicates"] = True
+            elif "People" in current and not self._tabs_loaded.get("people"):
+                setup_people_tab(self)
+                self._tabs_loaded["people"] = True
             elif "Extractor" in current and not self._tabs_loaded["extractor"]:
                 setup_extractor_tab(self)
                 self._tabs_loaded["extractor"] = True
