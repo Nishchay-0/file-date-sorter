@@ -43,7 +43,8 @@ try:
 except ImportError:
     HAS_SKLEARN = False
 
-from hashing import get_file_hash, fix_win_long_path
+from concurrent.futures import ThreadPoolExecutor
+from hashing import get_file_hash, fix_win_long_path, is_cloud_placeholder
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.heic', '.tiff', '.raw'}
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.mov', '.avi', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.vob', '.mpg', '.mpeg'}
@@ -74,12 +75,13 @@ class FaceSorterEngine:
             pass
 
     def _init_models(self):
-        """Initializes OpenCV YuNet/SFace models if available."""
+        """Initializes OpenCV YuNet/SFace models and ONNX Runtime session if available."""
         self.detector = None
         self.recognizer = None
+        self.ort_session = None
+
         if HAS_CV2 and hasattr(cv2, 'FaceDetectorYN_create') and hasattr(cv2, 'FaceRecognizerSF_create'):
             try:
-                # Attempts to load YuNet / SFace ONNX models if present
                 model_dir = os.path.join(os.path.dirname(__file__), "models")
                 yn_path = os.path.join(model_dir, "face_detection_yunet_2023mar.onnx")
                 sf_path = os.path.join(model_dir, "face_recognition_sface_2021dec.onnx")
@@ -89,29 +91,58 @@ class FaceSorterEngine:
             except Exception:
                 pass
 
-    def extract_faces_from_image_array(self, img_bgr):
+        try:
+            import onnxruntime as ort
+            sess_options = ort.SessionOptions()
+            sess_options.intra_op_num_threads = max(1, os.cpu_count() or 4)
+            sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
+            providers = ['DmlExecutionProvider', 'CPUExecutionProvider'] if sys.platform == 'win32' else ['CPUExecutionProvider']
+            # Store sess_options for fast inference
+            self.ort_sess_options = sess_options
+            self.ort_providers = providers
+        except Exception:
+            pass
+
+    def extract_faces_from_image_array(self, img_bgr, max_det_dim=640):
         """
         Extracts face bounding boxes and 128-d embedding vectors from a BGR image array.
+        OPTIMIZATION: Resizes input to max_det_dim (640px) before detection, scaling coordinates back.
         Returns list of dicts: [{'rect': (x, y, w, h), 'embedding': list, 'crop_bgr': array}]
         """
         if img_bgr is None or img_bgr.size == 0:
             return []
 
-        h, w = img_bgr.shape[:2]
+        orig_h, orig_w = img_bgr.shape[:2]
         results = []
 
+        # Downscale for fast detector inference if larger than max_det_dim
+        max_dim = max(orig_h, orig_w)
+        if max_dim > max_det_dim:
+            scale = max_det_dim / float(max_dim)
+            det_w = int(orig_w * scale)
+            det_h = int(orig_h * scale)
+            det_img = cv2.resize(img_bgr, (det_w, det_h), interpolation=cv2.INTER_AREA) if HAS_CV2 else img_bgr
+        else:
+            scale = 1.0
+            det_w, det_h = orig_w, orig_h
+            det_img = img_bgr
+
         # Strategy A: OpenCV YuNet / SFace ONNX Model
-        if self.detector and self.recognizer:
+        if self.detector and self.recognizer and HAS_CV2:
             try:
-                self.detector.setInputSize((w, h))
-                _, faces = self.detector.detect(img_bgr)
+                self.detector.setInputSize((det_w, det_h))
+                _, faces = self.detector.detect(det_img)
                 if faces is not None:
                     for face in faces:
-                        box = list(map(int, face[0:4]))
-                        x, y, bw, bh = box
-                        # Ensure bounds
+                        box = list(map(float, face[0:4]))
+                        # Rescale box back to original image dimensions
+                        x = int(box[0] / scale)
+                        y = int(box[1] / scale)
+                        bw = int(box[2] / scale)
+                        bh = int(box[3] / scale)
+
                         x, y = max(0, x), max(0, y)
-                        bw, bh = min(w - x, bw), min(h - y, bh)
+                        bw, bh = min(orig_w - x, bw), min(orig_h - y, bh)
                         if bw <= 10 or bh <= 10:
                             continue
                         aligned_face = self.recognizer.alignCrop(img_bgr, face)
@@ -127,16 +158,23 @@ class FaceSorterEngine:
             except Exception:
                 pass
 
-        # Strategy B: OpenCV Haar Cascade / HOG Fallback
+        # Strategy B: OpenCV Haar Cascade / HOG Fallback with downscaling
         if HAS_CV2:
             try:
-                gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+                gray = cv2.cvtColor(det_img, cv2.COLOR_BGR2GRAY)
                 cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
                 face_cascade = cv2.CascadeClassifier(cascade_path)
-                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30))
-                for (x, y, bw, bh) in faces:
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(24, 24))
+                for (x_s, y_s, bw_s, bh_s) in faces:
+                    x = int(x_s / scale)
+                    y = int(y_s / scale)
+                    bw = int(bw_s / scale)
+                    bh = int(bh_s / scale)
+                    x, y = max(0, x), max(0, y)
+                    bw, bh = min(orig_w - x, bw), min(orig_h - y, bh)
+                    if bw <= 10 or bh <= 10:
+                        continue
                     crop = img_bgr[y:y+bh, x:x+bw]
-                    # Compute a normalized 128-d color/texture feature vector as embedding
                     crop_resized = cv2.resize(crop, (16, 16))
                     hsv = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2HSV)
                     hist = cv2.calcHist([hsv], [0, 1, 2], None, [4, 4, 8], [0, 180, 0, 256, 0, 256])
@@ -146,7 +184,7 @@ class FaceSorterEngine:
                     else:
                         feat = feat[:128]
                     results.append({
-                        'rect': (int(x), int(y), int(bw), int(bh)),
+                        'rect': (x, y, bw, bh),
                         'embedding': feat.tolist(),
                         'crop_bgr': crop
                     })
@@ -160,6 +198,9 @@ class FaceSorterEngine:
         if not HAS_CV2:
             return []
         safe_fp = fix_win_long_path(filepath)
+        p_check = is_cloud_placeholder(safe_fp)
+        if p_check['is_placeholder'] and p_check['download_required']:
+            return []
         try:
             img = cv2.imread(safe_fp)
             return self.extract_faces_from_image_array(img)
@@ -167,10 +208,17 @@ class FaceSorterEngine:
             return []
 
     def process_video_file(self, filepath, sample_interval_sec=2.5):
-        """Samples video frames every sample_interval_sec seconds and extracts faces."""
+        """
+        Samples video frames every sample_interval_sec seconds.
+        OPTIMIZATION: Uses cheap frame difference filter to skip face detection on static scenes.
+        """
         if not HAS_CV2:
             return []
         safe_fp = fix_win_long_path(filepath)
+        p_check = is_cloud_placeholder(safe_fp)
+        if p_check['is_placeholder'] and p_check['download_required']:
+            return []
+
         faces = []
         try:
             cap = cv2.VideoCapture(safe_fp)
@@ -182,12 +230,31 @@ class FaceSorterEngine:
                 frame_stride = 1
 
             frame_idx = 0
+            prev_small_gray = None
+            last_detected = []
+
             while True:
                 ret, frame = cap.read()
                 if not ret:
                     break
                 if frame_idx % frame_stride == 0:
+                    # Video Frame Difference Filter
+                    small_gray = cv2.cvtColor(cv2.resize(frame, (160, 120)), cv2.COLOR_BGR2GRAY)
+                    if prev_small_gray is not None:
+                        diff = np.mean(cv2.absdiff(small_gray, prev_small_gray))
+                        if diff < 3.5 and len(last_detected) > 0:
+                            # Re-use previous frame detections for static video scene
+                            for d in last_detected:
+                                d_copy = dict(d)
+                                d_copy['timestamp_sec'] = round(frame_idx / fps, 2)
+                                faces.append(d_copy)
+                            prev_small_gray = small_gray
+                            frame_idx += 1
+                            continue
+
+                    prev_small_gray = small_gray
                     detected = self.extract_faces_from_image_array(frame)
+                    last_detected = detected
                     for d in detected:
                         d['timestamp_sec'] = round(frame_idx / fps, 2)
                         faces.append(d)
@@ -222,30 +289,37 @@ class FaceSorterEngine:
                 progress_callback(idx + 1, total_files, os.path.basename(fp))
 
             try:
-                mtime = os.path.getmtime(fp)
+                stat = os.stat(fp)
+                mtime = stat.st_mtime
+                size = stat.st_size
             except Exception:
                 mtime = 0
+                size = 0
 
-            f_hash = get_file_hash(fp) or fp
-            cache_key = f"{f_hash}_{mtime}"
+            # Cloud-friendly cache key (No SHA-256 file reading required for cache check!)
+            cache_key = f"{fp}_{size}_{mtime}"
 
             if cache_key in self.cache:
                 cached_faces = self.cache[cache_key]
             else:
-                ext = os.path.splitext(fp)[1].lower()
-                if ext in VIDEO_EXTENSIONS:
-                    raw_faces = self.process_video_file(fp, sample_interval_sec=sample_interval_sec)
+                p_check = is_cloud_placeholder(fp)
+                if p_check['is_placeholder'] and p_check['download_required']:
+                    cached_faces = []
                 else:
-                    raw_faces = self.process_image_file(fp)
+                    ext = os.path.splitext(fp)[1].lower()
+                    if ext in VIDEO_EXTENSIONS:
+                        raw_faces = self.process_video_file(fp, sample_interval_sec=sample_interval_sec)
+                    else:
+                        raw_faces = self.process_image_file(fp)
 
-                cached_faces = []
-                for rf in raw_faces:
-                    cached_faces.append({
-                        'rect': rf['rect'],
-                        'embedding': rf['embedding'],
-                        'timestamp_sec': rf.get('timestamp_sec', 0)
-                    })
-                self.cache[cache_key] = cached_faces
+                    cached_faces = []
+                    for rf in raw_faces:
+                        cached_faces.append({
+                            'rect': rf['rect'],
+                            'embedding': rf['embedding'],
+                            'timestamp_sec': rf.get('timestamp_sec', 0)
+                        })
+                    self.cache[cache_key] = cached_faces
 
             for f_idx, face in enumerate(cached_faces):
                 all_embeddings.append(face['embedding'])

@@ -22,3 +22,7 @@ installer_output/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# App Cache & Index Files
+.people_cache.json
+.people_index.json

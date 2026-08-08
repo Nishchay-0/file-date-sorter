@@ -1855,6 +1855,24 @@ if HAS_CUSTOMTKINTER:
 
             match_mode = self.dup_match_var.get()
             is_recursive = self.dup_recursive_var.get()
+
+            # Cloud-Aware Pre-Check & Informed Consent Dialog
+            if match_mode in ('content', 'perceptual_image', 'text_similarity'):
+                cand_files = gather_files(target_dir, is_recursive, selected_files=selected_files)
+                cloud_info = count_cloud_placeholders(cand_files)
+                if cloud_info['cloud_count'] > 0:
+                    sz_mb = round(cloud_info['total_bytes'] / (1024.0 * 1024.0), 1)
+                    sz_str = f"{sz_mb} MB" if sz_mb < 1024 else f"{round(sz_mb/1024.0, 2)} GB"
+                    msg = (
+                        f"☁️ Cloud-Only Files Detected!\n\n"
+                        f"Definitive duplicate matching ({match_mode}) requires reading file contents.\n"
+                        f"This scan will download {cloud_info['cloud_count']} cloud-only placeholder file(s) "
+                        f"totaling approximately {sz_str}.\n\n"
+                        f"Do you want to proceed and download these cloud files?\n\n"
+                        f"(Tip: Choose 'No' and select '⚡ Quick Scan (Name + Size)' for 0-download scanning!)"
+                    )
+                    if not messagebox.askyesno("Cloud Download Confirmation", msg):
+                        return
             
             raw_thresh = getattr(self, "dup_threshold_var", None)
             thresh_val = 0.9

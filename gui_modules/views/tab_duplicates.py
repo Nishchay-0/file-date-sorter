@@ -88,21 +88,21 @@ def setup_duplicates_tab(gui_instance):
     rb1 = ctk.CTkRadioButton(match_frame1, text="Exact Byte (SHA-256)", variable=gui_instance.dup_match_var, value="content", font=ctk.CTkFont(size=11, weight="bold"))
     rb1.pack(side="left", padx=(0, 10))
 
+    rb5 = ctk.CTkRadioButton(match_frame1, text="⚡ Quick Scan (Name + Size — No Download Required)", variable=gui_instance.dup_match_var, value="name_size", font=ctk.CTkFont(size=11, weight="bold"), text_color="#2e7d32")
+    rb5.pack(side="left", padx=(0, 10))
+
     rb2 = ctk.CTkRadioButton(match_frame1, text="👁️ Visual Image Similarity", variable=gui_instance.dup_match_var, value="perceptual_image", font=ctk.CTkFont(size=11, weight="bold"), text_color="#00acc1")
     rb2.pack(side="left", padx=(0, 10))
-
-    rb3 = ctk.CTkRadioButton(match_frame1, text="🔤 Fuzzy Name Match", variable=gui_instance.dup_match_var, value="fuzzy_name", font=ctk.CTkFont(size=11, weight="bold"), text_color="#8e24aa")
-    rb3.pack(side="left", padx=(0, 10))
-
-    rb4 = ctk.CTkRadioButton(match_frame1, text="📝 Text Similarity", variable=gui_instance.dup_match_var, value="text_similarity", font=ctk.CTkFont(size=11))
-    rb4.pack(side="left", padx=(0, 10))
 
     # Matching Rule Row 2 (Metadata & Thresholds)
     match_frame2 = ctk.CTkFrame(dup_control_card, fg_color="transparent")
     match_frame2.grid(row=7, column=0, columnspan=3, sticky="w", padx=12, pady=(2, 3))
 
-    rb5 = ctk.CTkRadioButton(match_frame2, text="Same Name & Size", variable=gui_instance.dup_match_var, value="name_size", font=ctk.CTkFont(size=11))
-    rb5.pack(side="left", padx=(0, 10))
+    rb3 = ctk.CTkRadioButton(match_frame2, text="🔤 Fuzzy Name Match", variable=gui_instance.dup_match_var, value="fuzzy_name", font=ctk.CTkFont(size=11, weight="bold"), text_color="#8e24aa")
+    rb3.pack(side="left", padx=(0, 10))
+
+    rb4 = ctk.CTkRadioButton(match_frame2, text="📝 Text Similarity", variable=gui_instance.dup_match_var, value="text_similarity", font=ctk.CTkFont(size=11))
+    rb4.pack(side="left", padx=(0, 10))
 
     rb6 = ctk.CTkRadioButton(match_frame2, text="Name + Size + Date", variable=gui_instance.dup_match_var, value="name_size_mtime", font=ctk.CTkFont(size=11))
     rb6.pack(side="left", padx=(0, 15))

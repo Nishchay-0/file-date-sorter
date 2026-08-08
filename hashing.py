@@ -9,11 +9,145 @@ import sys
 import hashlib
 import difflib
 
+import ctypes
+
 try:
     from PIL import Image
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
+
+# Windows Cloud File Attribute Constants (OneDrive, iCloud, Dropbox, Google Drive)
+FILE_ATTRIBUTE_READONLY = 0x00000001
+FILE_ATTRIBUTE_HIDDEN = 0x00000002
+FILE_ATTRIBUTE_SPARSE_FILE = 0x00000200
+FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400
+FILE_ATTRIBUTE_OFFLINE = 0x00001000
+FILE_ATTRIBUTE_RECALL_ON_OPEN = 0x00040000
+FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x00400000
+INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF
+
+
+def is_cloud_placeholder(filepath):
+    """
+    Checks if a file is a cloud-only placeholder stub (e.g. OneDrive, iCloud, Dropbox)
+    that is NOT fully cached locally on disk.
+
+    Returns dict:
+      {
+        'is_placeholder': bool,
+        'download_required': bool,
+        'attributes': int,
+        'nominal_size': int,
+        'allocated_size': int
+      }
+    """
+    safe_fp = fix_win_long_path(filepath)
+    result = {
+        'is_placeholder': False,
+        'download_required': False,
+        'attributes': 0,
+        'nominal_size': 0,
+        'allocated_size': 0
+    }
+
+    if not os.path.exists(safe_fp):
+        return result
+
+    try:
+        stat = os.stat(safe_fp)
+        result['nominal_size'] = stat.st_size
+    except Exception:
+        pass
+
+    if sys.platform == 'win32':
+        try:
+            attrs = ctypes.windll.kernel32.GetFileAttributesW(str(safe_fp))
+            if attrs != INVALID_FILE_ATTRIBUTES:
+                result['attributes'] = attrs
+                # Check for cloud recall or offline attributes
+                is_recall_open = bool(attrs & FILE_ATTRIBUTE_RECALL_ON_OPEN)
+                is_recall_data = bool(attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
+                is_offline = bool(attrs & FILE_ATTRIBUTE_OFFLINE)
+                is_sparse = bool(attrs & FILE_ATTRIBUTE_SPARSE_FILE)
+
+                if is_recall_open or is_recall_data or is_offline:
+                    result['is_placeholder'] = True
+                    result['download_required'] = True
+
+                # Secondary check: Allocated clusters on disk vs nominal file size
+                if result['nominal_size'] > 4096:
+                    try:
+                        # GetCompressedFileSizeW returns allocated size on disk
+                        high_dw = ctypes.c_ulong()
+                        low_dw = ctypes.windll.kernel32.GetCompressedFileSizeW(str(safe_fp), ctypes.byref(high_dw))
+                        if low_dw != 0xFFFFFFFF or ctypes.GetLastError() == 0:
+                            allocated = (high_dw.value << 32) + low_dw
+                            result['allocated_size'] = allocated
+                            if allocated == 0 or (allocated < 4096 and result['nominal_size'] > 65536):
+                                result['is_placeholder'] = True
+                                result['download_required'] = True
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    return result
+
+
+def count_cloud_placeholders(filepath_list):
+    """
+    Summarizes cloud-only placeholders in a list of files.
+    Returns dict with count of cloud files and total unhydrated bytes.
+    """
+    cloud_count = 0
+    total_bytes = 0
+    for fp in filepath_list:
+        p_info = is_cloud_placeholder(fp)
+        if p_info['is_placeholder'] or p_info['download_required']:
+            cloud_count += 1
+            total_bytes += p_info['nominal_size']
+    return {
+        'cloud_count': cloud_count,
+        'total_bytes': total_bytes
+    }
+
+
+def verify_safe_overwrite(src_path, dst_path, size_threshold_ratio=0.5):
+    """
+    CRITICAL OVERWRITE SAFETY GUARD:
+    Prevents silent data loss where a cloud placeholder stub (0-byte/small proxy)
+    or corrupted payload replaces an existing valid destination file.
+
+    Returns (is_safe: bool, reason: str).
+    """
+    safe_dst = fix_win_long_path(dst_path)
+    if not os.path.exists(safe_dst):
+        return True, "Destination file does not exist (New Write)"
+
+    try:
+        dst_size = os.path.getsize(safe_dst)
+    except Exception:
+        dst_size = 0
+
+    if dst_size == 0:
+        return True, "Existing destination is 0 bytes"
+
+    # Check source file size / placeholder state
+    src_placeholder = is_cloud_placeholder(src_path) if src_path and os.path.exists(fix_win_long_path(src_path)) else None
+
+    if src_placeholder and src_placeholder['is_placeholder'] and src_placeholder['download_required']:
+        return False, f"Aborted: Source file '{os.path.basename(src_path)}' is an unhydrated cloud placeholder stub. Overwriting destination would corrupt data."
+
+    if src_path and os.path.exists(fix_win_long_path(src_path)):
+        try:
+            src_size = os.path.getsize(fix_win_long_path(src_path))
+            if dst_size > 102400 and src_size < dst_size * size_threshold_ratio:
+                return False, f"Aborted: Source file size ({src_size:,} bytes) is dramatically smaller than existing destination ({dst_size:,} bytes)."
+        except Exception:
+            pass
+
+    return True, "Overwrite verified safe"
 
 
 def fix_win_long_path(path):

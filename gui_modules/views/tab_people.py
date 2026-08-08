@@ -146,6 +146,28 @@ def _start_people_scan(gui_instance):
         messagebox.showwarning("Directory Required", "Please select a valid directory containing photos or videos.")
         return
 
+    # Cloud Placeholder Pre-Check & Informed Consent Dialog
+    from hashing import count_cloud_placeholders
+    from sorter_core import gather_files
+    from face_sort import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+
+    all_files = gather_files(target_dir, recursive=True)
+    target_media = [fp for fp in all_files if os.path.splitext(fp)[1].lower() in (IMAGE_EXTENSIONS | VIDEO_EXTENSIONS)]
+    cloud_info = count_cloud_placeholders(target_media)
+
+    if cloud_info['cloud_count'] > 0:
+        sz_mb = round(cloud_info['total_bytes'] / (1024.0 * 1024.0), 1)
+        sz_str = f"{sz_mb} MB" if sz_mb < 1024 else f"{round(sz_mb/1024.0, 2)} GB"
+        msg = (
+            f"☁️ Cloud-Only Files Detected!\n\n"
+            f"Scanning for faces requires reading image pixel bytes.\n"
+            f"This folder contains {cloud_info['cloud_count']} cloud-only placeholder file(s) "
+            f"totaling approximately {sz_str}.\n\n"
+            f"Do you want to proceed and download these files from your cloud storage?"
+        )
+        if not messagebox.askyesno("Cloud Download Confirmation", msg):
+            return
+
     gui_instance.people_scan_btn.configure(state="disabled")
     gui_instance.people_progress_bar.set(0)
     gui_instance.people_status_lbl.configure(text="Status: Scanning files and computing face embeddings...")

@@ -19,7 +19,10 @@ from hashing import (
     get_file_fast_hash,
     get_image_perceptual_hash,
     calculate_hamming_similarity,
-    calculate_fuzzy_name_similarity
+    calculate_fuzzy_name_similarity,
+    is_cloud_placeholder,
+    count_cloud_placeholders,
+    verify_safe_overwrite
 )
 
 try:
@@ -383,7 +386,9 @@ def get_file_date(filepath, date_source='ctime', date_format_preference='DMY'):
 
     # 2. Check EXIF camera metadata if dt is still None and ('exif', 'smart', 'auto') requested
     if dt is None and any(k in ds_lower for k in ['exif', 'smart', 'auto', '📅']):
-        if HAS_PIL:
+        # Cloud Safety Guard: Skip binary EXIF file reading if file is an unhydrated cloud placeholder
+        placeholder_info = is_cloud_placeholder(safe_fp)
+        if HAS_PIL and not placeholder_info['is_placeholder']:
             try:
                 ext = os.path.splitext(filepath)[1].lower()
                 if ext in ['.jpg', '.jpeg', '.png', '.tiff', '.webp', '.heic']:
@@ -969,25 +974,28 @@ def find_duplicates(
         }
 
         ext = os.path.splitext(filename)[1].lower()
-        if ext in VIDEO_FILE_EXTENSIONS:
-            v_info = get_video_file_info(fp)
-            if v_info:
-                item['duration_str'] = v_info.get('duration_str', '')
-                item['duration_secs'] = v_info.get('duration_secs', 0)
-                item['width'] = v_info.get('width', 0)
-                item['height'] = v_info.get('height', 0)
-                item['res_str'] = v_info.get('res_str', '')
-                item['fps'] = v_info.get('fps', 0)
-                item['is_video'] = True
-        elif match_mode == 'perceptual_image' and HAS_PIL and ext in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif']:
-            p_data = get_image_perceptual_hash(fp)
-            if p_data:
-                item['phash'] = p_data['hash_int']
-                item['phash_str'] = p_data['hash_str']
-                item['width'] = p_data['width']
-                item['height'] = p_data['height']
-                item['megapixels'] = p_data['megapixels']
-                item['res_str'] = p_data['res_str']
+        # Cloud Safety Guard: Skip video/image binary file reads if file is an unhydrated cloud placeholder
+        p_check = is_cloud_placeholder(safe_fp)
+        if not p_check['is_placeholder']:
+            if ext in VIDEO_FILE_EXTENSIONS:
+                v_info = get_video_file_info(fp)
+                if v_info:
+                    item['duration_str'] = v_info.get('duration_str', '')
+                    item['duration_secs'] = v_info.get('duration_secs', 0)
+                    item['width'] = v_info.get('width', 0)
+                    item['height'] = v_info.get('height', 0)
+                    item['res_str'] = v_info.get('res_str', '')
+                    item['fps'] = v_info.get('fps', 0)
+                    item['is_video'] = True
+            elif match_mode == 'perceptual_image' and HAS_PIL and ext in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif']:
+                p_data = get_image_perceptual_hash(fp)
+                if p_data:
+                    item['phash'] = p_data['hash_int']
+                    item['phash_str'] = p_data['hash_str']
+                    item['width'] = p_data['width']
+                    item['height'] = p_data['height']
+                    item['megapixels'] = p_data['megapixels']
+                    item['res_str'] = p_data['res_str']
 
         file_items.append(item)
 
@@ -1343,6 +1351,10 @@ def move_duplicate_files(file_paths, dest_folder):
             if os.path.exists(safe_fp):
                 target_path = os.path.join(dest_folder, os.path.basename(fp))
                 safe_target = fix_win_long_path(target_path)
+                is_safe, reason = verify_safe_overwrite(safe_fp, safe_target)
+                if not is_safe:
+                    errors += 1
+                    continue
                 if not os.path.exists(safe_target):
                     shutil.move(safe_fp, safe_target)
                     moved += 1
