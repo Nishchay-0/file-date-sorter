@@ -44,10 +44,26 @@ except ImportError:
     HAS_SKLEARN = False
 
 from concurrent.futures import ThreadPoolExecutor
+import base64
+from concurrent.futures import ThreadPoolExecutor
 from hashing import get_file_hash, fix_win_long_path, is_cloud_placeholder
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.heic', '.tiff', '.raw'}
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.mov', '.avi', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.vob', '.mpg', '.mpeg'}
+
+
+def crop_to_b64(crop_bgr, target_size=(90, 90)):
+    """Encodes a BGR image crop into a compact JPEG Base64 string for instant GUI thumbnail rendering."""
+    if not HAS_CV2 or crop_bgr is None or crop_bgr.size == 0:
+        return ""
+    try:
+        resized = cv2.resize(crop_bgr, target_size, interpolation=cv2.INTER_AREA)
+        success, encoded = cv2.imencode('.jpg', resized, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+        if success:
+            return base64.b64encode(encoded.tobytes()).decode('ascii')
+    except Exception:
+        pass
+    return ""
 
 
 class FaceSorterEngine:
@@ -97,7 +113,6 @@ class FaceSorterEngine:
             sess_options.intra_op_num_threads = max(1, os.cpu_count() or 4)
             sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
             providers = ['DmlExecutionProvider', 'CPUExecutionProvider'] if sys.platform == 'win32' else ['CPUExecutionProvider']
-            # Store sess_options for fast inference
             self.ort_sess_options = sess_options
             self.ort_providers = providers
         except Exception:
@@ -105,9 +120,8 @@ class FaceSorterEngine:
 
     def extract_faces_from_image_array(self, img_bgr, max_det_dim=640):
         """
-        Extracts face bounding boxes and 128-d embedding vectors from a BGR image array.
-        OPTIMIZATION: Resizes input to max_det_dim (640px) before detection, scaling coordinates back.
-        Returns list of dicts: [{'rect': (x, y, w, h), 'embedding': list, 'crop_bgr': array}]
+        Extracts face bounding boxes, 128-d embedding vectors, and JPEG Base64 thumbnails.
+        Quality Filter: Ignores boxes < 36px or low-confidence detector artifacts.
         """
         if img_bgr is None or img_bgr.size == 0:
             return []
@@ -115,7 +129,6 @@ class FaceSorterEngine:
         orig_h, orig_w = img_bgr.shape[:2]
         results = []
 
-        # Downscale for fast detector inference if larger than max_det_dim
         max_dim = max(orig_h, orig_w)
         if max_dim > max_det_dim:
             scale = max_det_dim / float(max_dim)
@@ -135,7 +148,11 @@ class FaceSorterEngine:
                 if faces is not None:
                     for face in faces:
                         box = list(map(float, face[0:4]))
-                        # Rescale box back to original image dimensions
+                        # Quality Guard: YuNet detection confidence score (face[14])
+                        score = float(face[14]) if len(face) > 14 else 1.0
+                        if score < 0.65:
+                            continue
+
                         x = int(box[0] / scale)
                         y = int(box[1] / scale)
                         bw = int(box[2] / scale)
@@ -143,28 +160,34 @@ class FaceSorterEngine:
 
                         x, y = max(0, x), max(0, y)
                         bw, bh = min(orig_w - x, bw), min(orig_h - y, bh)
-                        if bw <= 10 or bh <= 10:
+
+                        # Minimum Size Guard: Reject tiny noise boxes < 36px
+                        if bw < 36 or bh < 36:
                             continue
+
                         aligned_face = self.recognizer.alignCrop(img_bgr, face)
                         feat = self.recognizer.feature(aligned_face)
                         embedding = feat.flatten().tolist()
                         crop = img_bgr[y:y+bh, x:x+bw]
+                        thumb_b64 = crop_to_b64(crop)
+
                         results.append({
                             'rect': (x, y, bw, bh),
                             'embedding': embedding,
-                            'crop_bgr': crop
+                            'crop_bgr': crop,
+                            'thumbnail_b64': thumb_b64
                         })
                     return results
             except Exception:
                 pass
 
-        # Strategy B: OpenCV Haar Cascade / HOG Fallback with downscaling
+        # Strategy B: OpenCV Haar Cascade / HOG Fallback with downscaling & quality filter
         if HAS_CV2:
             try:
                 gray = cv2.cvtColor(det_img, cv2.COLOR_BGR2GRAY)
                 cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
                 face_cascade = cv2.CascadeClassifier(cascade_path)
-                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(24, 24))
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(32, 32))
                 for (x_s, y_s, bw_s, bh_s) in faces:
                     x = int(x_s / scale)
                     y = int(y_s / scale)
@@ -172,7 +195,7 @@ class FaceSorterEngine:
                     bh = int(bh_s / scale)
                     x, y = max(0, x), max(0, y)
                     bw, bh = min(orig_w - x, bw), min(orig_h - y, bh)
-                    if bw <= 10 or bh <= 10:
+                    if bw < 36 or bh < 36:
                         continue
                     crop = img_bgr[y:y+bh, x:x+bw]
                     crop_resized = cv2.resize(crop, (16, 16))
@@ -183,10 +206,12 @@ class FaceSorterEngine:
                         feat = np.pad(feat, (0, 128 - len(feat)))
                     else:
                         feat = feat[:128]
+                    thumb_b64 = crop_to_b64(crop)
                     results.append({
                         'rect': (x, y, bw, bh),
                         'embedding': feat.tolist(),
-                        'crop_bgr': crop
+                        'crop_bgr': crop,
+                        'thumbnail_b64': thumb_b64
                     })
             except Exception:
                 pass
@@ -208,10 +233,7 @@ class FaceSorterEngine:
             return []
 
     def process_video_file(self, filepath, sample_interval_sec=2.5):
-        """
-        Samples video frames every sample_interval_sec seconds.
-        OPTIMIZATION: Uses cheap frame difference filter to skip face detection on static scenes.
-        """
+        """Samples video frames and extracts faces with frame difference filter."""
         if not HAS_CV2:
             return []
         safe_fp = fix_win_long_path(filepath)
@@ -238,12 +260,10 @@ class FaceSorterEngine:
                 if not ret:
                     break
                 if frame_idx % frame_stride == 0:
-                    # Video Frame Difference Filter
                     small_gray = cv2.cvtColor(cv2.resize(frame, (160, 120)), cv2.COLOR_BGR2GRAY)
                     if prev_small_gray is not None:
                         diff = np.mean(cv2.absdiff(small_gray, prev_small_gray))
                         if diff < 3.5 and len(last_detected) > 0:
-                            # Re-use previous frame detections for static video scene
                             for d in last_detected:
                                 d_copy = dict(d)
                                 d_copy['timestamp_sec'] = round(frame_idx / fps, 2)
@@ -264,10 +284,102 @@ class FaceSorterEngine:
             pass
         return faces
 
-    def scan_directory(self, target_dir, progress_callback=None, sample_interval_sec=2.5):
+    def _complete_linkage_cluster(self, X_norm, distance_threshold=0.34):
+        """
+        Complete-linkage agglomerative clustering ensuring every face pair in a cluster
+        has cosine distance <= distance_threshold. Completely eliminates the mega-cluster chaining bug!
+        """
+        n = len(X_norm)
+        if n == 0:
+            return []
+        sim_matrix = np.dot(X_norm, X_norm.T)
+        dist_matrix = np.clip(1.0 - sim_matrix, 0.0, 2.0)
+
+        clusters = [[i] for i in range(n)]
+
+        while len(clusters) > 1:
+            best_dist = 999.0
+            best_pair = (-1, -1)
+
+            for i in range(len(clusters)):
+                for j in range(i + 1, len(clusters)):
+                    # Complete linkage distance: maximum distance between any element in cluster i and cluster j
+                    max_d = max(dist_matrix[x, y] for x in clusters[i] for y in clusters[j])
+                    if max_d < best_dist:
+                        best_dist = max_d
+                        best_pair = (i, j)
+
+            if best_dist <= distance_threshold and best_pair != (-1, -1):
+                c1, c2 = best_pair
+                merged = clusters[c1] + clusters[c2]
+                clusters.pop(c2)
+                clusters[c1] = merged
+            else:
+                break
+
+        labels = [-1] * n
+        for c_idx, cluster in enumerate(clusters):
+            for member in cluster:
+                labels[member] = c_idx
+        return labels
+
+    def _simple_dbscan(self, X_norm, eps=0.34, min_samples=1, distance_threshold=None):
+        thresh = distance_threshold if distance_threshold is not None else eps
+        return self._complete_linkage_cluster(X_norm, distance_threshold=thresh)
+
+    def _flag_outlier_clusters(self, clusters):
+        """Identifies and flags unusually large clusters that absorb disproportionate faces."""
+        sizes = [len(c.get('faces', [])) for c in clusters.values()]
+        if not sizes or len(sizes) <= 2:
+            return clusters
+
+        total_faces = sum(sizes)
+        med_size = float(np.median(sizes))
+
+        for pid, c in clusters.items():
+            f_count = len(c.get('faces', []))
+            is_outlier = (f_count > 15 and f_count > med_size * 3.0 and (f_count / float(total_faces)) > 0.15)
+            c['is_outlier'] = is_outlier
+            if is_outlier:
+                c['outlier_warning'] = "⚠️ Unusually large — review for mixed people"
+            else:
+                c['outlier_warning'] = ""
+        return clusters
+
+    def _calculate_cluster_date_ranges(self, clusters):
+        """Calculates human-readable date ranges (e.g. 'Jan 2023 – Aug 2026') for each cluster."""
+        from sorter_core import get_file_date
+        for pid, c in clusters.items():
+            faces = c.get('faces', [])
+            dts = []
+            for f in faces:
+                fp = f.get('filepath')
+                if fp and os.path.exists(fix_win_long_path(fp)):
+                    dt = get_file_date(fp, date_source='smart')
+                    if dt:
+                        dts.append(dt)
+            if dts:
+                dts.sort()
+                min_dt = dts[0]
+                max_dt = dts[-1]
+                if min_dt.year == max_dt.year and min_dt.month == max_dt.month:
+                    date_str = min_dt.strftime("%b %Y")
+                else:
+                    date_str = f"{min_dt.strftime('%b %Y')} – {max_dt.strftime('%b %Y')}"
+                c['date_range_str'] = date_str
+                c['min_timestamp'] = min_dt.timestamp()
+                c['max_timestamp'] = max_dt.timestamp()
+            else:
+                c['date_range_str'] = "Date Unknown"
+                c['min_timestamp'] = 0
+                c['max_timestamp'] = 0
+        return clusters
+
+    def scan_directory(self, target_dir, progress_callback=None, sample_interval_sec=2.5, distance_threshold=0.34):
         """
         Scans directory for photos & videos, extracts face embeddings using cache,
-        clusters faces using DBSCAN, and returns structured People index.
+        clusters faces using Complete-Linkage Cosine distance thresholding,
+        flags outliers, calculates date ranges, and returns structured People index.
         """
         target_dir = fix_win_long_path(target_dir)
         if not os.path.exists(target_dir):
@@ -296,7 +408,6 @@ class FaceSorterEngine:
                 mtime = 0
                 size = 0
 
-            # Cloud-friendly cache key (No SHA-256 file reading required for cache check!)
             cache_key = f"{fp}_{size}_{mtime}"
 
             if cache_key in self.cache:
@@ -317,6 +428,7 @@ class FaceSorterEngine:
                         cached_faces.append({
                             'rect': rf['rect'],
                             'embedding': rf['embedding'],
+                            'thumbnail_b64': rf.get('thumbnail_b64', ''),
                             'timestamp_sec': rf.get('timestamp_sec', 0)
                         })
                     self.cache[cache_key] = cached_faces
@@ -327,30 +439,36 @@ class FaceSorterEngine:
                     'filepath': fp,
                     'rect': face['rect'],
                     'face_idx': f_idx,
+                    'thumbnail_b64': face.get('thumbnail_b64', ''),
                     'timestamp_sec': face.get('timestamp_sec', 0),
                     'is_video': os.path.splitext(fp)[1].lower() in VIDEO_EXTENSIONS
                 })
 
         self._save_json(self.cache, self.cache_file)
 
-        # Cluster embeddings using DBSCAN
+        # Cluster embeddings using Complete Linkage Cosine Clustering
         clusters = {}
-        unclustered = []
 
         if len(all_embeddings) > 0:
             X = np.array(all_embeddings)
-            # Normalize vectors
             norms = np.linalg.norm(X, axis=1, keepdims=True)
             norms[norms == 0] = 1.0
             X_norm = X / norms
 
-            labels = []
             if HAS_SKLEARN:
-                db = DBSCAN(eps=0.45, min_samples=1, metric='cosine')
-                labels = db.fit_predict(X_norm)
+                try:
+                    from sklearn.cluster import AgglomerativeClustering
+                    cluster_model = AgglomerativeClustering(
+                        n_clusters=None,
+                        distance_threshold=distance_threshold,
+                        metric='cosine',
+                        linkage='complete'
+                    )
+                    labels = cluster_model.fit_predict(X_norm)
+                except Exception:
+                    labels = self._complete_linkage_cluster(X_norm, distance_threshold=distance_threshold)
             else:
-                # Custom cosine-distance DBSCAN fallback
-                labels = self._simple_dbscan(X_norm, eps=0.45, min_samples=1)
+                labels = self._complete_linkage_cluster(X_norm, distance_threshold=distance_threshold)
 
             for idx, label in enumerate(labels):
                 meta = face_metadata[idx]
@@ -362,6 +480,9 @@ class FaceSorterEngine:
                     }
                 clusters[person_id]['faces'].append(meta)
 
+        self._flag_outlier_clusters(clusters)
+        self._calculate_cluster_date_ranges(clusters)
+
         index_result = {
             'scanned_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'total_files': total_files,
@@ -372,7 +493,72 @@ class FaceSorterEngine:
         self._save_json(self.index, self.index_file)
         return index_result
 
-    def _simple_dbscan(self, X_norm, eps=0.45, min_samples=1):
+    def merge_clusters(self, source_pids, target_pid):
+        """Merges specified source_pids into target_pid in self.index."""
+        if not self.index or 'clusters' not in self.index:
+            return False
+
+        clusters = self.index['clusters']
+        if target_pid not in clusters:
+            return False
+
+        target_faces = clusters[target_pid]['faces']
+        existing_keys = set((f['filepath'], f.get('face_idx', 0)) for f in target_faces)
+
+        for spid in source_pids:
+            if spid == target_pid or spid not in clusters:
+                continue
+            source_faces = clusters[spid].pop('faces', [])
+            for sf in source_faces:
+                key = (sf['filepath'], sf.get('face_idx', 0))
+                if key not in existing_keys:
+                    target_faces.append(sf)
+                    existing_keys.add(key)
+            del clusters[spid]
+
+        self._flag_outlier_clusters(clusters)
+        self._calculate_cluster_date_ranges(clusters)
+        self._save_json(self.index, self.index_file)
+        return True
+
+    def remove_face_from_cluster(self, pid, filepath, face_idx=0):
+        """Removes a face entry from cluster `pid` and moves it to 'Unassigned'."""
+        if not self.index or 'clusters' not in self.index:
+            return False
+
+        clusters = self.index['clusters']
+        if pid not in clusters:
+            return False
+
+        faces = clusters[pid].get('faces', [])
+        removed_face = None
+        remaining_faces = []
+
+        for f in faces:
+            if f.get('filepath') == filepath and f.get('face_idx', 0) == face_idx:
+                removed_face = f
+            else:
+                remaining_faces.append(f)
+
+        if removed_face:
+            clusters[pid]['faces'] = remaining_faces
+            if len(remaining_faces) == 0:
+                del clusters[pid]
+
+            unassigned_id = "Unassigned"
+            if unassigned_id not in clusters:
+                clusters[unassigned_id] = {
+                    'name': "Unassigned / Other",
+                    'faces': []
+                }
+            clusters[unassigned_id]['faces'].append(removed_face)
+
+            self._flag_outlier_clusters(clusters)
+            self._calculate_cluster_date_ranges(clusters)
+            self._save_json(self.index, self.index_file)
+            return True
+
+        return False
         """Pure numpy cosine distance DBSCAN clustering implementation."""
         n = len(X_norm)
         labels = [-1] * n
