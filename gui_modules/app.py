@@ -714,6 +714,46 @@ if HAS_CUSTOMTKINTER:
             self.status_lbl = ctk.CTkLabel(status_card, textvariable=self.status_var, font=ctk.CTkFont(size=11), anchor="w")
             self.status_lbl.pack(side="left", padx=12, fill="x", expand=True)
 
+        def _atomic_repaint_tab_widgets(self, tab_container=None):
+            """
+            MASTER ATOMIC VISUAL STATE RE-ASSERTION ENGINE:
+            Forces all CTkCheckBoxes, CTkFrames, and CTkLabels in the active tab to
+            re-draw atomically with full width and height, preventing transient 1px collapse
+            slivers or desynced canvas checkboxes upon tab switches or scrolling!
+            """
+            if not tab_container:
+                try:
+                    current_tab_name = self.tabview.get()
+                    tab_container = self.tabview.tab(current_tab_name)
+                except Exception:
+                    return
+
+            def _atomic_repaint_recursive(widget):
+                try:
+                    # If widget is a CTkCheckBox, force update_idletasks and _draw()
+                    if isinstance(widget, ctk.CTkCheckBox):
+                        try:
+                            if hasattr(widget, '_variable') and widget._variable is not None:
+                                val = widget._variable.get()
+                                if hasattr(widget, '_check_state') and widget._check_state != bool(val):
+                                    widget._check_state = bool(val)
+                            widget.update_idletasks()
+                            if hasattr(widget, '_draw'):
+                                widget._draw()
+                        except Exception:
+                            pass
+                    
+                    for child in widget.winfo_children():
+                        _atomic_repaint_recursive(child)
+                except Exception:
+                    pass
+
+            try:
+                tab_container.update_idletasks()
+                _atomic_repaint_recursive(tab_container)
+            except Exception:
+                pass
+
         def _on_tab_changed(self, tab_name=None):
             current = tab_name if tab_name else self.tabview.get()
 
@@ -747,6 +787,9 @@ if HAS_CUSTOMTKINTER:
             elif "Exclusions" in current and not self._tabs_loaded["exclusions"]:
                 setup_exclusions_tab(self)
                 self._tabs_loaded["exclusions"] = True
+
+            # Atomic Visual State Re-assertion
+            self.after(50, lambda: self._atomic_repaint_tab_widgets())
 
         def _on_watcher_notify(self, message):
             if hasattr(self, 'dup_log'):

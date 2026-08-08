@@ -377,10 +377,12 @@ def setup_organizer_tab(gui_instance):
     gui_instance.tree.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
     scrollbar.grid(row=0, column=1, sticky="ns", pady=4)
 
+    preview_card.grid_rowconfigure(1, weight=1, minsize=140)
+
     # Zero-Deletion Guarantee Banner — placed inside preview_card at row=2,
     # cleanly separated from tree_frame above with explicit spacing.
     guarantee_card = ctk.CTkFrame(preview_card, corner_radius=10, fg_color=("#e8f5e9", "#1b3320"), border_color="#388e3c", border_width=1)
-    guarantee_card.grid(row=2, column=0, sticky="ew", padx=12, pady=(6, 8), ipadx=8, ipady=4)
+    guarantee_card.grid(row=2, column=0, sticky="ew", padx=12, pady=(10, 8), ipadx=8, ipady=4)
 
     ctk.CTkLabel(
         guarantee_card,

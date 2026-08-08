@@ -184,6 +184,7 @@ def setup_duplicates_tab(gui_instance):
         master_chk = ctk.CTkCheckBox(
             hdr, text=type_label, variable=cat_var,
             font=ctk.CTkFont(size=10, weight="bold"),
+            checkbox_width=18, checkbox_height=18,
             command=lambda lbl=type_label: gui_instance._sync_dup_sub_from_cat(lbl)
         )
         master_chk.pack(side="left", fill="x", expand=True)
