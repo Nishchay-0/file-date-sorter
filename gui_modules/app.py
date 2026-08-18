@@ -393,34 +393,31 @@ if HAS_CUSTOMTKINTER:
                         except Exception:
                             curr = None
 
-                # Strategy 2: Active tab root scroll container fallback
+                # Strategy 2: Active tab root scroll container fallback (FIXED: only scroll active tab)
                 if not target:
                     try:
                         active_tab = self.tabview.get() if hasattr(self, 'tabview') else None
-                        tab_attr_map = {
-                            "👥 People Sorter": "people_scroll",
-                            "🔍 Duplicates Finder": "dup_main_scroll",
-                            "📅 File Organizer": "organizer_scroll",
-                            "🧹 Storage Cleaner": "cleaner_scroll",
-                            "📦 Subfolder Extractor": "extractor_scroll",
-                            "🏷️ Bulk Renamer": "renamer_scroll",
-                            "🪄 Magic Converter": "converter_scroll",
-                            "🚫 Exclusions": "exclusions_scroll",
-                            "📊 Analytics": "insights_scroll",
-                            "👁️ Auto Watcher": "watcher_scroll"
-                        }
-                        attr_name = tab_attr_map.get(active_tab)
-                        if attr_name:
-                            f_obj = getattr(self, attr_name, None)
-                            if f_obj and hasattr(f_obj, '_parent_canvas') and getattr(f_obj, '_parent_canvas', None):
-                                target = getattr(f_obj, '_parent_canvas')
-
-                        if not target:
-                            for attr in ('people_scroll', 'organizer_scroll', 'dup_main_scroll', 'cleaner_scroll', 'extractor_scroll', 'renamer_scroll', 'converter_scroll', 'exclusions_scroll', 'insights_scroll', 'watcher_scroll'):
-                                f_obj = getattr(self, attr, None)
-                                if f_obj and hasattr(f_obj, '_parent_canvas') and getattr(f_obj, '_parent_canvas', None):
-                                    target = getattr(f_obj, '_parent_canvas')
-                                    break
+                        if active_tab:
+                            tab_attr_map = {
+                                "👥 People Sorter": "people_scroll",
+                                "🔍 Duplicates Finder": "dup_main_scroll",
+                                "📅 File Organizer": "organizer_scroll",
+                                "🧹 Storage Cleaner": "cleaner_scroll",
+                                "📦 Subfolder Extractor": "extractor_scroll",
+                                "🏷️ Bulk Renamer": "renamer_scroll",
+                                "🪄 Magic Converter": "converter_scroll",
+                                "🚫 Exclusions": "exclusions_scroll",
+                                "📊 Analytics": "insights_scroll",
+                                "👁️ Auto Watcher": "watcher_scroll"
+                            }
+                            # CRITICAL FIX: Only use the ACTIVE tab's scroll container, not first-found
+                            attr_name = tab_attr_map.get(active_tab)
+                            if attr_name:
+                                f_obj = getattr(self, attr_name, None)
+                                if f_obj and hasattr(f_obj, '_parent_canvas'):
+                                    target_canvas = getattr(f_obj, '_parent_canvas', None)
+                                    if target_canvas:
+                                        target = target_canvas
                     except Exception:
                         pass
 
