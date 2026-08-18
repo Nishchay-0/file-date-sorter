@@ -26,3 +26,21 @@ desktop.ini
 # App Cache & Index Files
 .people_cache.json
 .people_index.json
+
+# ML Models (downloaded on-demand, not committed)
+models/
+*.onnx
+
+# Build artifacts & tool configs
+.specify/
+
+# Secrets & Credentials (NEVER commit)
+.env
+.env.local
+*.key
+*.pem
+*.pfx
+*.p12
+credentials.json
+config_local.json
+CODE_SIGNING_CERT_*
