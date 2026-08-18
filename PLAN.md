@@ -15,10 +15,18 @@
 - **[Commit: fb415a7]** Face clustering mega-cluster fix, complete-linkage cosine, thumbnails, search/sort/filter, gallery modal
 - **[Commit: 0d60ec1]** Checkbox desync fix across scrollable frames, atomic widget repaint engine, banner padding fix
 - **[Commit: e08511c (this session)]** Reverted d53b773 (atomic checkbox builder) — moved to git history as intentional rollback
+- **[Commit: b0fdb78 (this session)]** Fixed SCROLL-002 background tab scrolling bug + comprehensive regression tests (5 tests pass)
+
+### Documentation & Process Setup (This Session)
+- **[Created: CLAUDE.md]** Project summary, module map (13 files documented), how to run, hard constraints
+- **[Created: PLAN.md]** Living roadmap with completed items, in-progress, planned features (phased by priority)
+- **[Created: docs/known-issues.md]** Bug tracking with 4 critical/high, 3 medium priority, closed bugs section
+- **[Created: docs/constraints.md]** 9 hard constraints codified, violation escalation process, release review checklist
+- **[Created: test_scrolling_background_fix.py]** Regression test suite for SCROLL-002 (5 comprehensive tests)
 
 ### Testing Infrastructure
-- Pytest test suite with 15+ test files
-- Regression tests for face clustering, scrolling, checkbox state sync
+- Pytest test suite with 24 test files (22 passed, 2 skipped in latest run)
+- Regression tests for face clustering, scrolling, checkbox state sync, background scrolling fix
 - CI workflow (GitHub Actions)
 
 ---
@@ -26,7 +34,6 @@
 ## 🚧 In Progress
 
 - [ ] **Face model cache robustness** — `.people_cache.json` invalidation logic needs strengthening
-- [ ] **Scrolling edge cases** — Some tab widgets may still have repaint sync issues (atomic engine just deployed)
 - [ ] **Performance profiling** — Multi-threaded face scanning working; identify bottlenecks in other tools
 
 ---
@@ -78,27 +85,32 @@
 
 **From: This session (2026-08-18)**  
 **What changed:**
+- Fixed SCROLL-002: Background tab scrolling bug → only active tab now receives scroll events
+- Created comprehensive regression test suite (5 tests, all passing)
+- Set up persistent project documentation (CLAUDE.md, PLAN.md, docs/known-issues.md, docs/constraints.md)
 - Reverted commit d53b773 (atomic checkbox builder) → revert commit e08511c pushed to main
-- Created CLAUDE.md (project summary + module map)
-- About to create PLAN.md, known-issues.md, constraints.md
+- Created CLAUDE.md with complete module map (13 files, key classes documented)
 
 **Tests run:** 
-- Git revert executed successfully
-- No regression tests run yet (next step)
+- `pytest -v` → 22 passed, 2 skipped, 0 failed (total 24 tests)
+- SCROLL-002 regression tests: 5/5 PASSED
+- All prior tests (face clustering, checkbox sync, cloud safe mode): PASSED
 
 **What's left:**
-- Complete persistent documentation setup (known-issues.md, constraints.md, decisions.md)
-- Verify checkbox desync fix (0d60ec1) with actual scrolling stress tests
-- Clear up specs folder gap — restore or document why removed
+- Stress test SCROLL-002 fix under realistic scenarios (rapid scroll, drag, resize)
+- Clear up cache invalidation strategy (CACHE-001)
+- Audit exclusion engine across all 10 tools
+- Verify installer output (code signing, no SmartScreen warning)
 
 **To-do for next session (priority order):**
-1. Run `pytest -v` — verify no baseline failures
-2. Read & update known-issues.md with any recent bugs found
-3. Test face detection on low-memory system (edge case stress)
-4. Audit exclusion engine (verify `.git`, `node_modules` skipped everywhere)
-5. Create face model cache invalidation strategy doc
+1. Stress test scrolling fix (manual: rapid scroll, drag tab, resize window)
+2. Test face detection on 500+ image dataset (PEOPLE-001 validation)
+3. Design CACHE-001 fix (version-tagged `.people_cache.json` format)
+4. Audit exclusions: verify `.git`, `node_modules`, `_Duplicates` skipped everywhere
+5. Run full installer build + test output (SmartScreen warning check)
 
 **Evidence:**  
-- Commit: e08511c (revert successful)
-- Git log: 0d60ec1 (latest on main after revert)
-- Documentation: CLAUDE.md created with full module map
+- Commit: b0fdb78 (scrolling fix + regression tests pushed)
+- Test run: 22 passed, 2 skipped (no failures)
+- Documentation: 4 persistent files created (CLAUDE.md, PLAN.md, known-issues.md, constraints.md)
+- Root cause analysis: Fallback logic in mousewheel handler picked first scroll container instead of active tab
