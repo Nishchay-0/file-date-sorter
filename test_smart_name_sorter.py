@@ -167,6 +167,43 @@ class TestSmartNameSorter(unittest.TestCase):
         self.assertFalse(human_item["is_random"])
         self.assertIn("ansh_true", human_item["target_dir"])
 
+    def test_07_timestamp_and_camera_prefix_grouping(self):
+        """
+        Verify timestamped camera files like 'ANSHI-VID_20230809_190350_257' and
+        'VID_20230308_214221' group under 'ANSHI-VID' and 'VID'.
+        """
+        files = [
+            "ANSHI-VID_20230809_190350_257.mp4",
+            "ANSHI-VID_20230809_190855_011.mp4",
+            "ANSHI-VID_20240205_172813_449.mp4",
+            "VID_20230308_214221.mp4",
+            "VID_20230308_214256.mp4",
+            "VID_20250501_105916_619.mp4"
+        ]
+
+        for fname in files:
+            fp = os.path.join(self.test_dir, fname)
+            with open(fp, "w") as f: f.write("video content")
+
+        stats, _ = organize_by_name(self.test_dir, dry_run=False)
+        self.assertEqual(stats["processed"], 6)
+
+        # Verify ANSHI-VID folder
+        anshi_dir = os.path.join(self.test_dir, "ANSHI-VID")
+        self.assertTrue(os.path.isdir(anshi_dir))
+        self.assertTrue(os.path.exists(os.path.join(anshi_dir, "ANSHI-VID_20230809_190350_257.mp4")))
+        self.assertTrue(os.path.exists(os.path.join(anshi_dir, "ANSHI-VID_20240205_172813_449.mp4")))
+
+        # Verify VID folder
+        vid_dir = os.path.join(self.test_dir, "VID")
+        self.assertTrue(os.path.isdir(vid_dir))
+        self.assertTrue(os.path.exists(os.path.join(vid_dir, "VID_20230308_214221.mp4")))
+        self.assertTrue(os.path.exists(os.path.join(vid_dir, "VID_20250501_105916_619.mp4")))
+
+        # Ensure individual timestamp folders were NOT created
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "ANSHI-VID_20230809_190350_257")))
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "VID_20230308_214221")))
+
 
 if __name__ == "__main__":
     unittest.main()

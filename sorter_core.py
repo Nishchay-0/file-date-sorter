@@ -561,20 +561,45 @@ def is_random_or_hash_name(filename_or_basename):
     return False, f"Regular human name ('{base_name}')"
 
 
+TIMESTAMP_SUFFIX_REGEX = re.compile(
+    r'(?:[_-]\d{8}[_-]\d{6}(?:[_-]\d+)?|[_-]\d{8}|[_-]\d{4}[-._]\d{2}[-._]\d{2}|[_-]\d{6}|\s*\(\d+\)|\s*[-_]\s*copy.*|[_-]\d{1,4})$',
+    re.IGNORECASE
+)
+
+
+def extract_clean_title_prefix(filename_or_basename):
+    """
+    Strips trailing dates, timestamps, sequence counters, and copy suffixes from filename
+    to group related files (e.g. 'ANSHI-VID_20230809_190350_257' -> 'ANSHI-VID',
+    'VID_20230308_214221' -> 'VID').
+    Preserves meaningful title words (e.g. 'ansh_true' -> 'ansh_true', 'ansh_rao' -> 'ansh_rao').
+    """
+    if not filename_or_basename:
+        return ""
+    base_name = os.path.splitext(os.path.basename(filename_or_basename))[0].strip()
+    if not base_name:
+        return ""
+
+    cleaned = TIMESTAMP_SUFFIX_REGEX.sub('', base_name).strip('_- ')
+    return cleaned if cleaned else base_name
+
+
 def get_name_sort_folder(filename, random_folder_name="Unsorted"):
     """
     Computes destination subfolder for Smart Full-Name Matching mode:
       - If filename is flagged as machine-generated/hash-like: routes to single catch-all folder (e.g. 'Unsorted').
-      - Otherwise: routes to exact full base name (e.g. 'ansh_true' -> 'ansh_true/').
+      - Otherwise: strips date/timestamp/sequence suffixes to group related files (e.g. 'ANSHI-VID_...' -> 'ANSHI-VID/').
     Returns (folder_name: str, is_random: bool, reason: str).
     """
-    base_name = os.path.splitext(os.path.basename(filename))[0].strip()
     is_random, reason = is_random_or_hash_name(filename)
 
     if is_random:
         folder_name = random_folder_name if (random_folder_name and str(random_folder_name).strip()) else "Unsorted"
     else:
-        folder_name = base_name if base_name else "Unnamed"
+        folder_name = extract_clean_title_prefix(filename)
+        if not folder_name:
+            base_name = os.path.splitext(os.path.basename(filename))[0].strip()
+            folder_name = base_name if base_name else "Unnamed"
 
     return folder_name, is_random, reason
 
