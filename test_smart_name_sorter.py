@@ -391,5 +391,109 @@ class TestSmartNameSorter(unittest.TestCase):
             )
 
 
+    def test_13_master_prompt_rules_comprehensive(self):
+        """
+        Test 13 — Comprehensive Master Prompt Rules Verification:
+        1. Meaningful human names -> own folder, preserve numbers (invoice-1042, Nishchay2405, ansh_true, report-2026)
+        2. Machine/Random/Hash names -> ALL into ONE shared 'Unsorted/' folder:
+           - UUID (c6f1a063-299e-4595-be44-739eabc7d4e3)
+           - MD5 (5d41402abc4b2a76b9719d911017c592)
+           - SHA-1 (da39a3ee5e6b4b0d3255bfef95601890afd80709)
+           - SHA-256 (e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)
+           - Bare Hex ID (6B479171A31EEACBB382B96C37C97A82)
+           - Hex ID + export suffix (e.g. _video_dashinit, _transcode_output_dashinit, _transcode_oil_output_dashinit, _custom_suffix)
+           - Meta/FB/IG ID (0_103622762244864_4193263340616068702_n)
+           - Long random alphanumeric (infdhw489r09wujf09wej)
+        3. Camera & Snapchat exports -> stable prefix folder (ANSHI-VID, VID, Snapchat)
+        4. Idempotency: verify running twice creates no nested Unsorted/Unsorted or duplicate folders.
+        """
+        rule2_random = [
+            "c6f1a063-299e-4595-be44-739eabc7d4e3.png",
+            "5d41402abc4b2a76b9719d911017c592.jpg",
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709.tar",
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.dat",
+            "6B479171A31EEACBB382B96C37C97A82.bin",
+            "6B479171A31EEACBB382B96C37C97A82_video_dashinit.mp4",
+            "1C45F804E1DD671AB07F0E56724037A7_video_dashinit_17921868.mp4",
+            "8E4DD8ED0CA7D0F25CFB758C02D566B3_transcode_output_dashinit.mp4",
+            "4845B3B2A8C31D0FF940DBCA464195AB_transcode_oil_output_dashinit.mp4",
+            "3E4C5838BBD40A571449A7AB6BE282B0_transcode_custom_dashinit.mp4",
+            "0_103622762244864_4193263340616068702_n.jpg",
+            "infdhw489r09wujf09wej.txt",
+        ]
+
+        rule1_human = {
+            "ansh_true.jpg": "ansh_true",
+            "invoice-1042.pdf": "invoice-1042",
+            "Nishchay2405.jpg": "Nishchay2405",
+            "report-2026.pdf": "report-2026",
+        }
+
+        rule4_export = {
+            "ANSHI-VID_20230809_190350_257.mp4": "ANSHI-VID",
+            "VID_101211201_003350.mp4": "VID",
+            "Snapchat-236253845.jpg": "Snapchat",
+        }
+
+        # Create all files in test directory
+        for fn in rule2_random:
+            with open(os.path.join(self.test_dir, fn), "w") as f:
+                f.write("rand")
+        for fn in rule1_human:
+            with open(os.path.join(self.test_dir, fn), "w") as f:
+                f.write("human")
+        for fn in rule4_export:
+            with open(os.path.join(self.test_dir, fn), "w") as f:
+                f.write("export")
+
+        # 1. Check get_name_sort_folder routing
+        for fn in rule2_random:
+            folder, is_rand, reason = get_name_sort_folder(fn)
+            self.assertTrue(is_rand, f"Rule 2 failure on {fn}: reason={reason}")
+            self.assertEqual(folder, "Unsorted", f"Rule 2 wrong folder on {fn}: got {folder}")
+
+        for fn, expected in rule1_human.items():
+            folder, is_rand, reason = get_name_sort_folder(fn)
+            self.assertFalse(is_rand, f"Rule 1 false positive random on {fn}: reason={reason}")
+            self.assertEqual(folder, expected, f"Rule 1 wrong folder on {fn}: got {folder}")
+
+        for fn, expected in rule4_export.items():
+            folder, is_rand, reason = get_name_sort_folder(fn)
+            self.assertFalse(is_rand, f"Rule 4 false positive random on {fn}: reason={reason}")
+            self.assertEqual(folder, expected, f"Rule 4 wrong folder on {fn}: got {folder}")
+
+        # 2. Execute organization (Run 1)
+        total_files = len(rule2_random) + len(rule1_human) + len(rule4_export)
+        stats, _ = organize_by_name(self.test_dir, dry_run=False)
+        self.assertEqual(stats["processed"], total_files)
+
+        # 3. Verify files on disk
+        unsorted_dir = os.path.join(self.test_dir, "Unsorted")
+        self.assertTrue(os.path.isdir(unsorted_dir))
+        for fn in rule2_random:
+            self.assertTrue(os.path.exists(os.path.join(unsorted_dir, fn)), f"Missing in Unsorted/: {fn}")
+
+        for fn, expected in rule1_human.items():
+            self.assertTrue(os.path.exists(os.path.join(self.test_dir, expected, fn)), f"Missing {expected}/{fn}")
+
+        for fn, expected in rule4_export.items():
+            self.assertTrue(os.path.exists(os.path.join(self.test_dir, expected, fn)), f"Missing {expected}/{fn}")
+
+        # 4. Verify no per-file hash folders exist
+        for fn in rule2_random:
+            stem = os.path.splitext(fn)[0]
+            self.assertFalse(
+                os.path.exists(os.path.join(self.test_dir, stem)),
+                f"Per-file folder incorrectly created for hash: {stem}/"
+            )
+
+        # 5. Idempotency (Run 2)
+        stats2, _ = organize_by_name(self.test_dir, dry_run=False)
+        self.assertEqual(stats2["processed"], 0)
+        self.assertEqual(stats2["skipped"], total_files)
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "Unsorted", "Unsorted")))
+
+
 if __name__ == "__main__":
     unittest.main()
+

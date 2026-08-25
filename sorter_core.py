@@ -544,6 +544,13 @@ def is_random_or_hash_name(filename_or_basename):
     if cdn_stripped != base_name and HEX_HASH_REGEX.match(cdn_stripped):
         return True, f"Hex hash + CDN media stream suffix ('{base_name}')"
 
+    # 5b. Hex hash prefix (16+ hex chars) with any export/transcode suffix (match hex part first)
+    hex_prefix_match = re.match(r'^([0-9a-fA-F]{16,})[_\-]', base_name)
+    if hex_prefix_match:
+        leading_hex = hex_prefix_match.group(1)
+        if any(c.lower() in 'abcdef' for c in leading_hex) or len(leading_hex) >= 20:
+            return True, f"Hex hash ID ({len(leading_hex)} hex chars) with export suffix ('{base_name}')"
+
     # 6. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702 >= 12 digits)
     clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
     if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
