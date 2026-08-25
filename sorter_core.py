@@ -509,6 +509,15 @@ COMMON_STOPWORDS = {
 }
 
 
+def natural_sort_key(text):
+    """
+    Natural alphanumeric sorting key:
+    Numbers are compared numerically, text lexicographically (case-insensitive).
+    """
+    chunks = [c for c in re.split(r'(\d+)', str(text)) if c]
+    return [(0, int(c)) if c.isdigit() else (1, c.lower()) for c in chunks]
+
+
 def extract_meaningful_group(filename):
     """
     Extracts the meaningful title / multi-word group from a filename:
@@ -516,6 +525,7 @@ def extract_meaningful_group(filename):
     - Filters out machine hashes, pure numbers, UUIDs, Meta CDN IDs, and interleaved gibberish.
     - Removes common leading stopwords ('the', 'a', 'an', 'my', 'your', etc.) to prevent false collisions.
     - Preserves multi-word title prefixes before the first digit or date pattern.
+    - If filename starts with a leading numeric prefix (e.g. '2024_report.pdf'), strips leading digits to extract the topic word.
     - Returns clean underscore-joined title group (e.g. 'june_pearl', 'silent_eyes', 'document', 'guru_finance_report'),
       or None if no meaningful alphabetic words exist.
 
@@ -525,6 +535,7 @@ def extract_meaningful_group(filename):
       'my_document_2024.pdf' -> 'document'
       'a_nice_photo.jpg' -> 'nice_photo'
       'guru_finance_report.xls' -> 'guru_finance_report'
+      '2024_report.pdf' -> 'report'
       '336101256_21499.jpg' -> None
       'hfqgifcbkj9.png' -> None
       '323f9w8ehf8awjefi.docx' -> None
@@ -566,8 +577,13 @@ def extract_meaningful_group(filename):
     if clean_no_sep.isdigit() and len(clean_no_sep) >= 10:
         return None
 
+    # If stem starts with a leading numeric prefix like '2024_' or '01-', strip it for semantic fallback
+    work_stem = stem
+    if re.match(r'^\d+[\s_\-]+', work_stem):
+        work_stem = re.sub(r'^\d+[\s_\-]+', '', work_stem).strip(' _-.')
+
     # Extract alphabetical/underscore prefix before the first digit or date pattern
-    m = re.match(r'^([a-zA-Z\s_\-]+?)(?=[0-9]|$)', stem)
+    m = re.match(r'^([a-zA-Z\s_\-]+?)(?=[0-9]|$)', work_stem)
     if not m:
         return None
 
