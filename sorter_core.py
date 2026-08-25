@@ -2506,22 +2506,257 @@ def undo_manifest(manifest_path, progress_callback=None):
     return stats
 
 
+def cleanup_filename_str(name: str) -> str:
+    r"""
+    Cleans up a filename string:
+    - Removes illegal NTFS/FAT characters (\ / : * ? " < > |).
+    - Removes redundant copy patterns like ' (1)', ' - Copy', '_copy'.
+    - Collapses multiple whitespace, underscores, or hyphens into clean single delimiters.
+    - Trims leading/trailing whitespace, periods, and underscores.
+    """
+    if not name:
+        return ""
+    # Strip illegal characters
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '', name)
+    # Remove copy markers: ' (1)', ' - Copy (2)', '_copy', etc.
+    cleaned = re.sub(r'[\s_\-]*(?:[-_\s]?copy|\(\d+\)|\(\s*copy\s*\))', '', cleaned, flags=re.IGNORECASE)
+    # Handle extension separately if present
+    stem, ext = os.path.splitext(cleaned)
+    if ext:
+        stem = re.sub(r'\s+', ' ', stem)
+        stem = re.sub(r'_+', '_', stem)
+        stem = re.sub(r'-+', '-', stem)
+        stem = stem.strip(' ._-')
+        return f"{stem}{ext.strip()}"
+    else:
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+        cleaned = re.sub(r'_+', '_', cleaned)
+        cleaned = re.sub(r'-+', '-', cleaned)
+        return cleaned.strip(' ._-')
+
+
+def extract_file_metadata(file_path: str) -> dict:
+    """
+    Extracts rich file metadata for extended renaming tags:
+    - Dates (Created, Modified, Current)
+    - Image/Video Dimensions (Width, Height, Resolution)
+    - File Sizes (Bytes, KB, MB)
+    - Category & Clean Name
+    """
+    safe_fp = fix_win_long_path(file_path)
+    now = datetime.now()
+    meta = {
+        "YYYY": f"{now.year:04d}",
+        "MM": f"{now.month:02d}",
+        "DD": f"{now.day:02d}",
+        "HH": f"{now.hour:02d}",
+        "Min": f"{now.minute:02d}",
+        "Sec": f"{now.second:02d}",
+        "DateCreated": f"{now.year:04d}-{now.month:02d}-{now.day:02d}",
+        "DateModified": f"{now.year:04d}-{now.month:02d}-{now.day:02d}",
+        "TimeCreated": f"{now.hour:02d}-{now.minute:02d}-{now.second:02d}",
+        "TimeModified": f"{now.hour:02d}-{now.minute:02d}-{now.second:02d}",
+        "CurrentDate": f"{now.year:04d}-{now.month:02d}-{now.day:02d}",
+        "CurrentTime": f"{now.hour:02d}-{now.minute:02d}-{now.second:02d}",
+        "Width": "",
+        "Height": "",
+        "Resolution": "",
+        "SizeMB": "0",
+        "SizeKB": "0",
+        "SizeBytes": "0",
+        "Category": "Other",
+        "Title": "",
+        "Artist": "",
+        "Album": "",
+    }
+
+    if not file_path or not os.path.exists(safe_fp):
+        return meta
+
+    try:
+        dt_c = get_file_date(file_path, 'ctime')
+        meta["DateCreated"] = f"{dt_c.year:04d}-{dt_c.month:02d}-{dt_c.day:02d}"
+        meta["TimeCreated"] = f"{dt_c.hour:02d}-{dt_c.minute:02d}-{dt_c.second:02d}"
+        meta["YYYY"] = f"{dt_c.year:04d}"
+        meta["MM"] = f"{dt_c.month:02d}"
+        meta["DD"] = f"{dt_c.day:02d}"
+        meta["HH"] = f"{dt_c.hour:02d}"
+        meta["Min"] = f"{dt_c.minute:02d}"
+        meta["Sec"] = f"{dt_c.second:02d}"
+    except Exception:
+        pass
+
+    try:
+        dt_m = get_file_date(file_path, 'mtime')
+        meta["DateModified"] = f"{dt_m.year:04d}-{dt_m.month:02d}-{dt_m.day:02d}"
+        meta["TimeModified"] = f"{dt_m.hour:02d}-{dt_m.minute:02d}-{dt_m.second:02d}"
+    except Exception:
+        pass
+
+    try:
+        sz = os.path.getsize(safe_fp)
+        meta["SizeBytes"] = str(sz)
+        meta["SizeKB"] = f"{sz / 1024.0:.1f}"
+        meta["SizeMB"] = f"{sz / (1024.0 * 1024.0):.2f}"
+    except Exception:
+        pass
+
+    fn = os.path.basename(file_path)
+    meta["Category"] = get_file_category(fn)
+
+    # Extract image/video dimensions where applicable
+    ext = os.path.splitext(fn)[1].lower()
+    if HAS_PIL and ext in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.tiff']:
+        try:
+            with Image.open(safe_fp) as img:
+                w, h = img.size
+                meta["Width"] = str(w)
+                meta["Height"] = str(h)
+                meta["Resolution"] = f"{w}x{h}"
+        except Exception:
+            pass
+    elif ext in ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.webm', '.flv']:
+        try:
+            import cv2
+            cap = cv2.VideoCapture(safe_fp)
+            if cap.isOpened():
+                w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                if w > 0 and h > 0:
+                    meta["Width"] = str(w)
+                    meta["Height"] = str(h)
+                    meta["Resolution"] = f"{w}x{h}"
+                cap.release()
+        except Exception:
+            pass
+
+    return meta
+
+
+def build_renamed_filename(
+    file_path: str,
+    naming_pattern: str = "{OriginalName}",
+    case_transform: str = "none",
+    search_text: str = "",
+    replace_text: str = "",
+    use_regex: bool = False,
+    prefix: str = "",
+    suffix: str = "",
+    cleanup: bool = False,
+    counter_idx: int = 1,
+    counter_start: int = 1,
+    counter_step: int = 1,
+    counter_padding: int = 3,
+    is_directory: bool = False
+) -> str:
+    """
+    Builds the proposed destination filename for a file or folder given transformation rules.
+    """
+    old_filename = os.path.basename(file_path.rstrip('/\\'))
+    if is_directory:
+        base_name = old_filename
+        ext = ""
+    else:
+        base_name, ext = os.path.splitext(old_filename)
+
+    new_base = base_name
+
+    # 1. Search & Replace (Standard or Regex)
+    if search_text:
+        if use_regex:
+            try:
+                new_base = re.sub(search_text, replace_text, new_base)
+            except Exception:
+                pass
+        else:
+            new_base = new_base.replace(search_text, replace_text)
+
+    # 2. Cleanup mode
+    if cleanup:
+        new_base = cleanup_filename_str(new_base)
+
+    # 3. Case transformation
+    if case_transform == "upper":
+        new_base = new_base.upper()
+    elif case_transform == "lower":
+        new_base = new_base.lower()
+    elif case_transform == "title":
+        new_base = new_base.title()
+    elif case_transform == "camel":
+        words = [w for w in re.split(r'[\s_\-]+', new_base) if w]
+        if words:
+            new_base = words[0].lower() + "".join(w.capitalize() for w in words[1:])
+    elif case_transform == "snake":
+        words = [w for w in re.split(r'[\s_\-]+', new_base) if w]
+        new_base = "_".join(w.lower() for w in words)
+    elif case_transform == "kebab":
+        words = [w for w in re.split(r'[\s_\-]+', new_base) if w]
+        new_base = "-".join(w.lower() for w in words)
+
+    # 4. Extract metadata tags
+    meta = extract_file_metadata(file_path)
+
+    # 5. Calculate sequential number
+    calc_num = counter_start + (counter_idx - 1) * counter_step
+    calc_num_padded = f"{calc_num:0{counter_padding}d}"
+
+    # 6. Apply pattern replacements
+    pattern = naming_pattern if naming_pattern else "{OriginalName}"
+    result = pattern.replace("{OriginalName}", new_base)
+    result = result.replace("{CleanName}", cleanup_filename_str(base_name))
+    result = result.replace("{Extension}", ext.lstrip('.'))
+
+    # Number tags
+    result = result.replace("{001}", calc_num_padded)
+    result = result.replace("{01}", f"{calc_num:02d}")
+    result = result.replace("{1}", str(calc_num))
+    result = result.replace("{A01}", f"A{calc_num:02d}")
+    result = result.replace("{P001}", f"P{calc_num:03d}")
+
+    # Metadata tags
+    for tag, val in meta.items():
+        result = result.replace(f"{{{tag}}}", str(val))
+
+    final_name = f"{prefix}{result}{suffix}{ext}"
+    if cleanup:
+        # Final pass cleanup
+        final_stem, final_ext = os.path.splitext(final_name) if not is_directory else (final_name, "")
+        final_name = cleanup_filename_str(final_stem) + final_ext
+
+    return final_name
+
+
 def batch_rename_files(
     file_paths,
     naming_pattern="{OriginalName}",
     case_transform="none",
     search_text="",
     replace_text="",
+    use_regex=False,
     prefix="",
     suffix="",
+    cleanup=False,
+    counter_start=1,
+    counter_step=1,
+    counter_padding=3,
+    on_conflict="number",
+    dry_run=False,
+    rename_folders=False,
     progress_callback=None
 ):
     """
-    Batch renames files based on custom pattern, case transformation, search/replace, prefix & suffix.
+    Advanced Batch Renamer Pro:
+    - Extended metadata tags ({DateCreated}, {Width}, {Height}, {SizeMB}, etc.)
+    - Regex search & replace with capture groups
+    - Case transformations (camelCase, snake_case, kebab-case, UPPERCASE, lowercase, Title Case)
+    - Custom sequential numbering (start at N, step S, padding P)
+    - Conflict handling ('number', 'skip', 'replace')
+    - 1-Click Undo system vault manifest generation
     """
     total = len(file_paths)
     renamed = 0
     errors = 0
+    skipped = 0
     operations = []
 
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2531,76 +2766,104 @@ def batch_rename_files(
     for idx, fp in enumerate(file_paths, 1):
         safe_fp = fix_win_long_path(fp)
         if not os.path.exists(safe_fp):
+            skipped += 1
             continue
 
-        dir_name = os.path.dirname(fp)
-        old_filename = os.path.basename(fp)
-        base_name, ext = os.path.splitext(old_filename)
+        is_dir = os.path.isdir(safe_fp)
+        if is_dir and not rename_folders:
+            continue
 
-        new_base = base_name
+        dir_name = os.path.dirname(fp.rstrip('/\\'))
+        final_filename = build_renamed_filename(
+            file_path=fp,
+            naming_pattern=naming_pattern,
+            case_transform=case_transform,
+            search_text=search_text,
+            replace_text=replace_text,
+            use_regex=use_regex,
+            prefix=prefix,
+            suffix=suffix,
+            cleanup=cleanup,
+            counter_idx=idx,
+            counter_start=counter_start,
+            counter_step=counter_step,
+            counter_padding=counter_padding,
+            is_directory=is_dir
+        )
 
-        if search_text:
-            new_base = new_base.replace(search_text, replace_text)
-
-        if case_transform == "upper":
-            new_base = new_base.upper()
-        elif case_transform == "lower":
-            new_base = new_base.lower()
-        elif case_transform == "title":
-            new_base = new_base.title()
-        elif case_transform == "camel":
-            words = [w for w in re.split(r'[\s_\-]+', new_base) if w]
-            if words:
-                new_base = words[0].lower() + "".join(w.capitalize() for w in words[1:])
-
-        date_obj = get_file_date(fp, 'ctime')
-        cat = get_file_category(old_filename)
-
-        new_name = naming_pattern.replace("{OriginalName}", new_base)
-        new_name = new_name.replace("{YYYY}", f"{date_obj.year:04d}")
-        new_name = new_name.replace("{MM}", f"{date_obj.month:02d}")
-        new_name = new_name.replace("{DD}", f"{date_obj.day:02d}")
-        new_name = new_name.replace("{Category}", cat)
-        new_name = new_name.replace("{001}", f"{idx:03d}")
-
-        final_filename = f"{prefix}{new_name}{suffix}{ext}"
         new_filepath = os.path.join(dir_name, final_filename)
-
-        if new_filepath == fp:
+        if os.path.abspath(new_filepath) == os.path.abspath(fp):
+            skipped += 1
+            if progress_callback:
+                progress_callback(idx, total, fp, "Unchanged", "skipped")
             continue
 
-        if os.path.exists(fix_win_long_path(new_filepath)):
-            new_filepath = resolve_filename_collision(dir_name, final_filename)
-            final_filename = os.path.basename(new_filepath)
-
+        # Handle file collision / conflict
         safe_new_fp = fix_win_long_path(new_filepath)
+        if os.path.exists(safe_new_fp):
+            if on_conflict == "skip":
+                skipped += 1
+                if progress_callback:
+                    progress_callback(idx, total, fp, "Skipped (Destination exists)", "skipped")
+                continue
+            elif on_conflict == "replace":
+                vault_trash = get_system_vault_dir("TrashDuplicates")
+                trash_path = os.path.join(vault_trash, f"{os.path.splitext(final_filename)[0]}_{int(time.time())}{os.path.splitext(final_filename)[1]}")
+                try:
+                    if not dry_run:
+                        shutil.move(safe_new_fp, fix_win_long_path(trash_path))
+                except Exception:
+                    pass
+            else: # 'number' (default)
+                new_filepath = resolve_filename_collision(dir_name, final_filename)
+                final_filename = os.path.basename(new_filepath)
+                safe_new_fp = fix_win_long_path(new_filepath)
 
-        try:
-            shutil.move(safe_fp, safe_new_fp)
+        op_record = {
+            "src": fp,
+            "dst": new_filepath,
+            "filename": final_filename,
+            "mode": "move",
+            "is_directory": is_dir
+        }
+
+        if not dry_run:
+            try:
+                shutil.move(safe_fp, safe_new_fp)
+                renamed += 1
+                operations.append(op_record)
+                if progress_callback:
+                    progress_callback(idx, total, fp, f"Renamed -> {final_filename}", "success")
+            except Exception as e:
+                errors += 1
+                if progress_callback:
+                    progress_callback(idx, total, fp, f"Rename Error: {str(e)}", "error")
+        else:
             renamed += 1
-            operations.append({
-                "src": fp,
-                "dst": new_filepath,
-                "filename": final_filename,
-                "mode": "move"
-            })
+            operations.append(op_record)
             if progress_callback:
-                progress_callback(idx, total, fp, f"Renamed -> {final_filename}", "success")
-        except Exception as e:
-            errors += 1
-            if progress_callback:
-                progress_callback(idx, total, fp, f"Rename Error: {str(e)}", "error")
+                progress_callback(idx, total, fp, f"[DRY RUN] Would rename -> {final_filename}", "dryrun")
 
-    if operations:
+    if not dry_run and operations:
         manifest_data = {
             "timestamp": timestamp_str,
             "mode": "move",
+            "operation_type": "batch_rename",
             "operations": operations
         }
-        with open(fix_win_long_path(vault_manifest_path), 'w', encoding='utf-8') as f:
-            json.dump(manifest_data, f, indent=2)
+        try:
+            with open(fix_win_long_path(vault_manifest_path), 'w', encoding='utf-8') as f:
+                json.dump(manifest_data, f, indent=2)
+        except Exception:
+            pass
 
-    return {"total": total, "renamed": renamed, "errors": errors, "manifest": vault_manifest_path if operations else None}
+    return {
+        "total": total,
+        "renamed": renamed,
+        "skipped": skipped,
+        "errors": errors,
+        "manifest": vault_manifest_path if (not dry_run and operations) else None
+    }
 
 
 def scan_junk_and_large_files(folder, exclude_folders=None, exclude_files=None, exclude_exts=None):

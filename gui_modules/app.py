@@ -49,6 +49,8 @@ from sorter_core import (
     scan_folder_extensions,
     clean_empty_dirs,
     batch_rename_files,
+    build_renamed_filename,
+    cleanup_filename_str,
     get_file_date,
     get_file_category,
     scan_junk_and_large_files,
@@ -5738,6 +5740,7 @@ if HAS_CUSTOMTKINTER:
 
         def refresh_renamer_preview(self):
             folder = self.ren_dir_var.get().strip()
+            include_folders = getattr(self, 'ren_folders_var', None) and self.ren_folders_var.get()
             if self.rename_preview_files:
                 files = self.rename_preview_files
             elif folder and os.path.isdir(fix_win_long_path(folder)):
@@ -5748,70 +5751,96 @@ if HAS_CUSTOMTKINTER:
                     exclude_folders=self.parse_comma_list(self.exclude_folders_var.get().strip()),
                     exclude_files=self.parse_comma_list(self.exclude_files_var.get().strip())
                 )
+                if include_folders:
+                    subdirs = [os.path.join(folder, d) for d in os.listdir(fix_win_long_path(folder)) if os.path.isdir(os.path.join(fix_win_long_path(folder), d))]
+                    files = subdirs + files
             else:
                 return
 
             for item in self.ren_tree.get_children():
                 self.ren_tree.delete(item)
 
-            self.ren_stats_lbl.configure(text=f"Files to Rename: {len(files)}")
-
             pattern = self.ren_pattern_var.get().strip() or "{OriginalName}"
             case_raw = self.ren_case_var.get()
-            case_key = "lower" if "lowercase" in case_raw else ("upper" if "UPPERCASE" in case_raw else ("title" if "Title" in case_raw else ("camel" if "camel" in case_raw else "none")))
+            case_key = "lower" if "lowercase" in case_raw else ("upper" if "UPPERCASE" in case_raw else ("title" if "Title" in case_raw else ("camel" if "camel" in case_raw else ("snake" if "snake" in case_raw else ("kebab" if "kebab" in case_raw else "none")))))
 
             search_t = self.ren_find_var.get()
             replace_t = self.ren_replace_var.get()
+            use_regex = getattr(self, 'ren_regex_var', None) and self.ren_regex_var.get()
+            cleanup_on = getattr(self, 'ren_cleanup_var', None) and self.ren_cleanup_var.get()
             prefix_t = self.ren_prefix_var.get()
             suffix_t = self.ren_suffix_var.get()
 
+            changes_count = 0
+
             for idx, fp in enumerate(files[:300], 1):
-                fn = os.path.basename(fp)
-                base, ext = os.path.splitext(fn)
+                is_dir = os.path.isdir(fix_win_long_path(fp))
+                fn = os.path.basename(fp.rstrip('/\\'))
 
-                new_base = base
-                if search_t:
-                    new_base = new_base.replace(search_t, replace_t)
+                final_fn = build_renamed_filename(
+                    file_path=fp,
+                    naming_pattern=pattern,
+                    case_transform=case_key,
+                    search_text=search_t,
+                    replace_text=replace_t,
+                    use_regex=use_regex,
+                    prefix=prefix_t,
+                    suffix=suffix_t,
+                    cleanup=cleanup_on,
+                    counter_idx=idx,
+                    is_directory=is_dir
+                )
 
-                if case_key == "upper":
-                    new_base = new_base.upper()
-                elif case_key == "lower":
-                    new_base = new_base.lower()
-                elif case_key == "title":
-                    new_base = new_base.title()
+                # Determine Diff Status
+                if final_fn != fn:
+                    changes_count += 1
+                    target_fp = os.path.join(os.path.dirname(fp.rstrip('/\\')), final_fn)
+                    if os.path.exists(fix_win_long_path(target_fp)):
+                        status_tag = "⚠️ Conflict"
+                    else:
+                        status_tag = "✏️ Changed"
+                else:
+                    status_tag = "— Same"
 
-                dt = get_file_date(fp)
-                cat = get_file_category(fn)
-
-                new_fn = pattern.replace("{OriginalName}", new_base)
-                new_fn = new_fn.replace("{YYYY}", f"{dt.year:04d}")
-                new_fn = new_fn.replace("{MM}", f"{dt.month:02d}")
-                new_fn = new_fn.replace("{DD}", f"{dt.day:02d}")
-                new_fn = new_fn.replace("{Category}", cat)
-                new_fn = new_fn.replace("{001}", f"{idx:03d}")
-
-                final_fn = f"{prefix_t}{new_fn}{suffix_t}{ext}"
+                cat = "Folder" if is_dir else get_file_category(fn)
 
                 try:
-                    sz_str = format_bytes(os.path.getsize(fix_win_long_path(fp)))
+                    sz_str = format_bytes(os.path.getsize(fix_win_long_path(fp))) if not is_dir else "[Dir]"
                 except Exception:
                     sz_str = "0 B"
 
-                self.ren_tree.insert("", "end", values=(fn, final_fn, cat, sz_str))
+                self.ren_tree.insert("", "end", values=(status_tag, fn, final_fn, cat, sz_str))
+
+            self.ren_stats_lbl.configure(text=f"Total: {len(files)} | Changes: {changes_count}")
 
         def start_batch_rename(self):
             exc_folds = self.parse_comma_list(self.exclude_folders_var.get().strip())
             exc_files = self.parse_comma_list(self.exclude_files_var.get().strip())
             exc_exts = self.parse_comma_list(self.exclude_ext_var.get().strip())
             ren_dir = self.ren_dir_var.get().strip()
-            files = self.rename_preview_files if self.rename_preview_files else (gather_files(ren_dir, recursive=False, exclude_exts=exc_exts, exclude_folders=exc_folds, exclude_files=exc_files) if os.path.isdir(fix_win_long_path(ren_dir)) else [])
+            include_folders = getattr(self, 'ren_folders_var', None) and self.ren_folders_var.get()
+
+            if self.rename_preview_files:
+                files = self.rename_preview_files
+            elif ren_dir and os.path.isdir(fix_win_long_path(ren_dir)):
+                files = gather_files(ren_dir, recursive=False, exclude_exts=exc_exts, exclude_folders=exc_folds, exclude_files=exc_files)
+                if include_folders:
+                    subdirs = [os.path.join(ren_dir, d) for d in os.listdir(fix_win_long_path(ren_dir)) if os.path.isdir(os.path.join(fix_win_long_path(ren_dir), d))]
+                    files = subdirs + files
+            else:
+                files = []
+
             if not files:
                 messagebox.showwarning("No Files", "Please select a valid directory or pick files to rename.")
                 return
 
             pattern = self.ren_pattern_var.get().strip() or "{OriginalName}"
             case_raw = self.ren_case_var.get()
-            case_key = "lower" if "lowercase" in case_raw else ("upper" if "UPPERCASE" in case_raw else ("title" if "Title" in case_raw else ("camel" if "camel" in case_raw else "none")))
+            case_key = "lower" if "lowercase" in case_raw else ("upper" if "UPPERCASE" in case_raw else ("title" if "Title" in case_raw else ("camel" if "camel" in case_raw else ("snake" if "snake" in case_raw else ("kebab" if "kebab" in case_raw else "none")))))
+
+            # Map conflict choice
+            conflict_raw = getattr(self, 'ren_conflict_var', None) and self.ren_conflict_var.get()
+            on_conflict = "skip" if "Skip" in str(conflict_raw) else ("replace" if "Replace" in str(conflict_raw) else "number")
 
             res = batch_rename_files(
                 files,
@@ -5819,12 +5848,47 @@ if HAS_CUSTOMTKINTER:
                 case_transform=case_key,
                 search_text=self.ren_find_var.get(),
                 replace_text=self.ren_replace_var.get(),
+                use_regex=getattr(self, 'ren_regex_var', None) and self.ren_regex_var.get(),
                 prefix=self.ren_prefix_var.get(),
-                suffix=self.ren_suffix_var.get()
+                suffix=self.ren_suffix_var.get(),
+                cleanup=getattr(self, 'ren_cleanup_var', None) and self.ren_cleanup_var.get(),
+                rename_folders=include_folders,
+                on_conflict=on_conflict
             )
 
-            messagebox.showinfo("Batch Rename Finished", f"Successfully renamed {res['renamed']} file(s)!\n\nManifest saved to Protected System Vault for 1-Click Restore.")
+            msg = f"Successfully renamed {res['renamed']} item(s)!"
+            if res.get('skipped'):
+                msg += f"\nSkipped: {res['skipped']} unchanged or conflicted items."
+            if res.get('manifest'):
+                msg += "\n\nManifest saved to Protected System Vault. 1-Click Undo is available anytime!"
+
+            messagebox.showinfo("Batch Rename Finished", msg)
             self.refresh_renamer_preview()
+
+        def undo_last_batch_rename(self):
+            manifests = list_manifest_files()
+            if not manifests:
+                messagebox.showinfo("No Undo History", "No rename operations found in System Vault to undo.")
+                return
+
+            latest = manifests[0]
+            confirm = messagebox.askyesno(
+                "Confirm 1-Click Undo",
+                f"Undo the most recent operation from {latest.get('timestamp_display', 'recent')}?\n\n"
+                f"This will restore files back to their exact original filenames."
+            )
+            if not confirm:
+                return
+
+            try:
+                stats = undo_manifest(latest["path"])
+                messagebox.showinfo(
+                    "Undo Complete",
+                    f"Successfully restored {stats['undone']} item(s) back to original names!"
+                )
+                self.refresh_renamer_preview()
+            except Exception as e:
+                messagebox.showerror("Undo Error", f"Failed to undo rename operation: {str(e)}")
 
         def browse_dup_files(self):
             files = filedialog.askopenfilenames(title="Select Specific Files to Check for Duplicates")
