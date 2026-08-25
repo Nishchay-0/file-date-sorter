@@ -31,11 +31,16 @@ UUID_REGEX = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA
 CDN_MEDIA_SUFFIX_REGEX = re.compile(r'[_-](video_dashinit|transcode_output_dashinit|video_init|audio_dashinit|media_dashinit|dash_init)$', re.IGNORECASE)
 META_CDN_REGEX = re.compile(r'^\d+_\d{10,}_\d{10,}_[a-zA-Z0-9]+$', re.IGNORECASE)
 
-PROTECTED_DIRS = {
-    '01_Numeric', '02_Standard', '03_Hashes',
-    'indexed_folders', 'hash_folders', 'Unsorted',
-    '.git', '.svn', '.hg', '__pycache__', '.pytest_cache'
-}
+try:
+    from config import DEFAULT_PROTECTED_DIRS
+    PROTECTED_DIRS = set(DEFAULT_PROTECTED_DIRS)
+except ImportError:
+    PROTECTED_DIRS = {
+        '01_Numeric', '02_Standard', '03_Hashes',
+        'indexed_folders', 'hash_folders', 'Unsorted', '_Random',
+        '.git', '.svn', '.hg', '__pycache__', '.pytest_cache',
+        'node_modules', '$RECYCLE.BIN', 'System Volume Information'
+    }
 
 
 def natural_sort_key(text: str) -> List[Tuple[int, Any]]:

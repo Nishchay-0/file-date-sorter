@@ -20,6 +20,7 @@ A powerful, modern desktop application and command-line utility for organizing, 
 9. **📊 Storage Analytics Dashboard**: Visual category size breakdowns, date range span, and top subfolder disk usage.
 10. **🚫 Unified Path Exclusion Engine**: Skip specific folders (`.git`, `node_modules`, `_Duplicates`), custom directories (picked via **"Except Folder..."**), file names, or extensions across all tools.
 11. **🛡️ System Vault Backup & 1-Click Undo**: Preview operations with Dry-Run mode, generate System Vault Zip backups, and restore any operation using 1-click undo manifests.
+12. **🎨 Apple Glassmorphism Design System**: Modern macOS Big Sur / Monterey inspired UI with translucent frosted cards, clean Segoe UI typography, vibrant neon accent colors, hover micro-animations, and a one-click `🌙 Dark / ☀️ Light` segmented theme toggle.
 
 ---
 
