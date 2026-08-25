@@ -478,12 +478,114 @@ COMMON_HUMAN_WORD_ROOTS = {
     'doc', 'document', 'scan', 'recording', 'audio', 'track', 'song',
     'file', 'report', 'backup', 'copy', 'final', 'draft', 'test', 'data',
     'invoice', 'resume', 'note', 'notes', 'paper', 'project', 'presentation',
-    'movie', 'clip', 'music', 'sound', 'chapter', 'part', 'page', 'sample',
-    'vacation', 'trip', 'holiday', 'family', 'wedding', 'birthday', 'party',
-    'work', 'school', 'home', 'house', 'car', 'travel', 'summer', 'winter',
-    'spring', 'autumn', 'fall', 'january', 'february', 'march', 'april',
-    'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'
+    'movie', 'clip', 'music', 'sound', 'chapter', 'part', 'page', 'sample'
 }
+
+
+def is_random_or_hash_name(filename_or_basename):
+    """
+    Detects if a filename is machine-generated / random hash vs a human-named file.
+    Returns (is_random: bool, reason: str).
+
+    Heuristics:
+      1. UUID / GUID formats -> Random
+      2. Pure hexadecimal hashes (MD5, SHA1, SHA256) of length >= 12 -> Random
+      3. Meta / Facebook / Instagram CDN hash IDs (e.g. 0_103622762244864_4193263340616068702_n) -> Random
+      4. Multi-digit numeric ID sequences separated by underscores -> Random
+      5. Length >= 10 with NO separators ('_', '-', ' ', '.') and mixed letters+digits,
+         no dictionary words, and abnormal consonant clusters (>4 consonants) or high entropy -> Random
+      6. Structured names (with separators or recognizable human words) -> Human Named
+    """
+    if not filename_or_basename:
+        return False, "Empty filename"
+
+    # Strip compound extensions first (.zip.nomedia, .jpg.nomedia)
+    base_name = strip_all_extensions(filename_or_basename).strip() if 'strip_all_extensions' in globals() else os.path.splitext(os.path.basename(filename_or_basename))[0].strip()
+    if not base_name:
+        return False, "Empty base filename"
+
+    # 1. UUID Check
+    if UUID_REGEX.match(base_name):
+        return True, f"UUID machine-generated identifier ('{base_name}')"
+
+    # 2. Pure short numeric folder names (0, 1, 2, 05, 27, 28) - machine-generated sequence IDs
+    if base_name.isdigit():
+        return True, f"Short numeric machine ID ('{base_name}')"
+
+    # 2b. Separator-only or punctuation-only names like '_', '--', '__' - meaningless system artifacts
+    if re.match(r'^[\s_\-\.]+$', base_name):
+        return True, f"Separator/punctuation-only machine artifact ('{base_name}')"
+
+    # 3. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars)
+    if HEX_HASH_REGEX.match(base_name):
+        return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
+
+    # 4. Meta / Facebook / Instagram CDN Hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
+    if META_CDN_REGEX.match(base_name):
+        return True, f"Facebook/Instagram/Meta CDN machine hash ID ('{base_name}')"
+
+    # 5. Hex hash + streaming CDN media suffix (e.g. 3E4396DAE40C47DA_video_dashinit, 7B4E3C_transcode_output_dashinit)
+    cdn_stripped = CDN_MEDIA_SUFFIX_REGEX.sub('', base_name)
+    if cdn_stripped != base_name and HEX_HASH_REGEX.match(cdn_stripped):
+        return True, f"Hex hash + CDN media stream suffix ('{base_name}')"
+
+    # 6. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702)
+    clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
+    if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
+        return True, f"Numeric machine ID sequence ({len(clean_no_sep)} digits) ('{base_name}')"
+
+    # 7. Separator Check: Names with '_', '-', ' ', '.' usually indicate human structured naming
+    has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
+
+    if has_separator:
+        return False, f"Structured human name with separators ('{base_name}')"
+
+    # 4. Length check: random strings are typically >= 10 chars without separators
+    name_len = len(base_name)
+    if name_len < 10:
+        return False, f"Short name (<10 chars) ('{base_name}')"
+
+    # Check for presence of common human word roots
+    base_lower = base_name.lower()
+    for root in COMMON_HUMAN_WORD_ROOTS:
+        if root in base_lower:
+            return False, f"Contains human word root '{root}' ('{base_name}')"
+
+    # Check if purely alphabetic human-like word vs mixed alphanumeric
+    has_digits = any(c.isdigit() for c in base_name)
+    has_letters = any(c.isalpha() for c in base_name)
+
+    # 5. Mixed alphanumeric without separators
+    if has_digits and has_letters:
+        vowels = set('aeiouAEIOU')
+        vowel_count = sum(1 for c in base_name if c in vowels)
+        vowel_ratio = vowel_count / float(name_len)
+        consonant_cluster = CONSONANT_CLUSTER_REGEX.search(base_name)
+
+        char_counts = {}
+        for c in base_name:
+            char_counts[c] = char_counts.get(c, 0) + 1
+        entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
+
+        if consonant_cluster:
+            cluster_text = consonant_cluster.group(0)
+            return True, f"Random machine-generated name: {name_len} chars, mixed alphanumeric, consonant cluster '{cluster_text}' (entropy: {entropy:.2f})"
+
+        if vowel_ratio < 0.18 or vowel_ratio > 0.80 or entropy > 2.9:
+            return True, f"Random machine-generated name: {name_len} chars, mixed alphanumeric with abnormal vowel ratio {vowel_ratio:.1%} (entropy: {entropy:.2f})"
+
+    # 6. High entropy string of length >= 12 with consonant cluster
+    if name_len >= 12:
+        char_counts = {}
+        for c in base_name:
+            char_counts[c] = char_counts.get(c, 0) + 1
+        entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
+
+        consonant_cluster = CONSONANT_CLUSTER_REGEX.search(base_name)
+        if consonant_cluster and entropy > 2.8:
+            return True, f"Random string: {name_len} chars, high entropy {entropy:.2f}, consonant cluster '{consonant_cluster.group(0)}'"
+
+    return False, f"Regular human name ('{base_name}')"
 
 
 def strip_all_extensions(filename_or_basename):
@@ -500,245 +602,6 @@ def strip_all_extensions(filename_or_basename):
         else:
             break
     return name
-
-
-def classify_filename(filename_or_basename):
-    """
-    Classifies a filename into structured categorization metadata.
-    Returns:
-      {
-          "is_random": bool,
-          "random_type": str | None,   # "uuid", "hash", "meta_cdn", "numeric_id", "alphanumeric", "unknown" or None
-          "confidence": float,
-          "reason": str,
-          "is_structured_camera": bool,
-          "camera_prefix": str | None,
-          "is_platform_export": bool,
-          "platform_name": str | None,
-          "clean_title": str,
-          "classification_label": str
-      }
-    """
-    if not filename_or_basename:
-        return {
-            'is_random': False, 'random_type': None, 'confidence': 0.0,
-            'reason': 'Empty filename', 'is_structured_camera': False,
-            'camera_prefix': None, 'is_platform_export': False,
-            'platform_name': None, 'clean_title': 'Unnamed', 'classification_label': 'Empty'
-        }
-
-    base_name = strip_all_extensions(filename_or_basename).strip()
-    if not base_name:
-        return {
-            'is_random': False, 'random_type': None, 'confidence': 0.0,
-            'reason': 'Empty base filename', 'is_structured_camera': False,
-            'camera_prefix': None, 'is_platform_export': False,
-            'platform_name': None, 'clean_title': 'Unnamed', 'classification_label': 'Empty'
-        }
-
-    # 1. UUID Check
-    if UUID_REGEX.match(base_name):
-        return {
-            'is_random': True, 'random_type': 'uuid', 'confidence': 0.99,
-            'reason': f'UUID machine-generated identifier ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / UUID'
-        }
-
-    # 2. Meta / Facebook / Instagram CDN hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
-    if META_CDN_REGEX.match(base_name):
-        return {
-            'is_random': True, 'random_type': 'meta_cdn', 'confidence': 0.99,
-            'reason': f'Facebook/Instagram/Meta CDN machine hash ID ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / Meta_CDN'
-        }
-
-    # 3. Numeric machine IDs (pure digits e.g. 123456789012345678, short 0, 1, 05, 27)
-    if base_name.isdigit():
-        return {
-            'is_random': True, 'random_type': 'numeric_id', 'confidence': 0.95,
-            'reason': f'Numeric machine ID sequence ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / Numeric_ID'
-        }
-
-    # Separator-only artifacts (_, --, ..)
-    if re.match(r'^[\s_\-\.]+$', base_name):
-        return {
-            'is_random': True, 'random_type': 'numeric_id', 'confidence': 0.90,
-            'reason': f'Separator-only artifact ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / Numeric_ID'
-        }
-
-    # Multi-digit sequence with separators (clean >= 12 pure digits)
-    clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
-    if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
-        return {
-            'is_random': True, 'random_type': 'numeric_id', 'confidence': 0.95,
-            'reason': f'Numeric machine ID sequence ({len(clean_no_sep)} digits)',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / Numeric_ID'
-        }
-
-    # 4. Pure Hexadecimal Hash (MD5, SHA1, SHA256 >= 12 chars, must contain at least one hex letter a-f)
-    if HEX_HASH_REGEX.match(base_name) and any(c.lower() in 'abcdef' for c in base_name):
-        hash_type = 'MD5' if len(base_name) == 32 else ('SHA-1' if len(base_name) == 40 else ('SHA-256' if len(base_name) == 64 else 'Hex'))
-        return {
-            'is_random': True, 'random_type': 'hash', 'confidence': 0.98,
-            'reason': f'{hash_type} hexadecimal hash ({len(base_name)} hex chars)',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / Hashes'
-        }
-
-    # 5. Hex hash + streaming CDN media suffix (e.g. 3E4396DAE40C47DA_video_dashinit)
-    cdn_stripped = CDN_MEDIA_SUFFIX_REGEX.sub('', base_name)
-    if cdn_stripped != base_name and HEX_HASH_REGEX.match(cdn_stripped):
-        return {
-            'is_random': True, 'random_type': 'hash', 'confidence': 0.98,
-            'reason': f'Hex hash with streaming CDN suffix ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / Hashes'
-        }
-
-    # 6. Check Platform Export (Snapchat, Instagram, Takeout, etc.)
-    # e.g. 2022-02-25_media~Snapchat-1499352345, Snapchat-236253845
-    plat_match = re.search(r'(?:^|[\d_\.\-~])(Snapchat|Instagram|TikTok|Facebook|Twitter|WhatsApp|Takeout)[~_\-]', base_name, re.IGNORECASE)
-    if plat_match:
-        plat_name = plat_match.group(1).capitalize()
-        if plat_name.lower() == 'whatsapp': plat_name = 'WhatsApp'
-        elif plat_name.lower() == 'tiktok': plat_name = 'TikTok'
-        elif plat_name.lower() == 'snapchat': plat_name = 'Snapchat'
-        return {
-            'is_random': False, 'random_type': None, 'confidence': 0.95,
-            'reason': f'Platform/export naming pattern ({plat_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': True, 'platform_name': plat_name,
-            'clean_title': plat_name, 'classification_label': f'Platform / {plat_name}'
-        }
-
-    # 7. Check Structured Camera / Video Pattern
-    # e.g. ANSHI-VID_20230809_190350_257, VID_20230308_214221, VID_101211201_003350, IMG_20230101_120000
-    cam_match = re.match(r'^([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*?)[_-](\d{4,}[_-]\d{4,}(?:[_-]\d+)*|\d{8,}[_-]\d{6,}|\d{8,})$', base_name)
-    if cam_match:
-        prefix = cam_match.group(1)
-        return {
-            'is_random': False, 'random_type': None, 'confidence': 0.95,
-            'reason': f'Structured camera/video prefix ({prefix})',
-            'is_structured_camera': True, 'camera_prefix': prefix,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': prefix, 'classification_label': f'Structured / {prefix}'
-        }
-
-    # 8. Human Copy / Duplicate suffix check
-    # e.g. Vacation (1), Vacation_1, Vacation - Copy, Project Report (1)
-    clean_title = re.sub(r'(\s*\(\d+\)|\s*[-_]\s*copy.*|\s*[-_]\s*\d+)$', '', base_name, flags=re.IGNORECASE).strip('_- ')
-    if not clean_title:
-        clean_title = base_name
-
-    # 9. Separators in name ('_', '-', ' ', '.') usually indicate human structured naming
-    has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
-    if has_separator:
-        return {
-            'is_random': False, 'random_type': None, 'confidence': 0.92,
-            'reason': f'Structured human name with separators ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': clean_title, 'classification_label': 'Human Name'
-        }
-
-    # 10. No separators: check length and human features
-    name_len = len(base_name)
-    if name_len < 10:
-        return {
-            'is_random': False, 'random_type': None, 'confidence': 0.85,
-            'reason': f'Short human name ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Human Name'
-        }
-
-    # Check for presence of common human word roots (e.g. invoice, final, project, report, vacation, photo)
-    base_lower = base_name.lower()
-    for root in COMMON_HUMAN_WORD_ROOTS:
-        if root in base_lower:
-            return {
-                'is_random': False, 'random_type': None, 'confidence': 0.90,
-                'reason': f'Human name containing dictionary root "{root}" ({base_name})',
-                'is_structured_camera': False, 'camera_prefix': None,
-                'is_platform_export': False, 'platform_name': None,
-                'clean_title': base_name, 'classification_label': 'Human Name'
-            }
-
-    # Check CamelCase / TitleCase word boundaries (e.g. Project2026Report, Vacation2024Photos, Nishchay2405)
-    has_uppercase = any(c.isupper() for c in base_name)
-    has_lowercase = any(c.islower() for c in base_name)
-    if has_uppercase and has_lowercase:
-        camel_words = re.findall(r'[A-Z][a-z]+|\d+', base_name)
-        if len(camel_words) >= 2 or (len(camel_words) == 1 and any(c.isdigit() for c in base_name)):
-            return {
-                'is_random': False, 'random_type': None, 'confidence': 0.88,
-                'reason': f'CamelCase/TitleCase human structured name ({base_name})',
-                'is_structured_camera': False, 'camera_prefix': None,
-                'is_platform_export': False, 'platform_name': None,
-                'clean_title': base_name, 'classification_label': 'Human Name'
-            }
-
-    # Pure letters with normal vowel ratio -> Human word
-    has_digits = any(c.isdigit() for c in base_name)
-    has_letters = any(c.isalpha() for c in base_name)
-    vowels = set('aeiouAEIOU')
-    vowel_count = sum(1 for c in base_name if c in vowels)
-    vowel_ratio = vowel_count / float(name_len)
-    consonant_cluster = CONSONANT_CLUSTER_REGEX.search(base_name)
-
-    char_counts = {}
-    for c in base_name: char_counts[c] = char_counts.get(c, 0) + 1
-    entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
-
-    if not has_digits and has_letters and not consonant_cluster and 0.25 <= vowel_ratio <= 0.65:
-        return {
-            'is_random': False, 'random_type': None, 'confidence': 0.85,
-            'reason': f'Pure alphabetic word with normal vowel distribution ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Human Name'
-        }
-
-    # If it has consonant cluster or abnormal vowels or high entropy -> Random Alphanumeric
-    if consonant_cluster or vowel_ratio < 0.18 or vowel_ratio > 0.80 or entropy > 2.8:
-        return {
-            'is_random': True, 'random_type': 'alphanumeric', 'confidence': 0.90,
-            'reason': f'Random alphanumeric machine string ({base_name})',
-            'is_structured_camera': False, 'camera_prefix': None,
-            'is_platform_export': False, 'platform_name': None,
-            'clean_title': base_name, 'classification_label': 'Random / Alphanumeric'
-        }
-
-    return {
-        'is_random': True, 'random_type': 'unknown', 'confidence': 0.70,
-        'reason': f'Unclassified random string ({base_name})',
-        'is_structured_camera': False, 'camera_prefix': None,
-        'is_platform_export': False, 'platform_name': None,
-        'clean_title': base_name, 'classification_label': 'Random / Unknown'
-    }
-
-
-def is_random_or_hash_name(filename_or_basename):
-    """
-    Backwards-compatible wrapper around classify_filename.
-    Returns (is_random: bool, reason: str).
-    """
-    info = classify_filename(filename_or_basename)
-    return info['is_random'], info['reason']
 
 
 def extract_clean_title_prefix(filename_or_basename):
@@ -762,10 +625,7 @@ def extract_clean_title_prefix(filename_or_basename):
     if not filename_or_basename:
         return ""
     
-    info = classify_filename(filename_or_basename)
-    if info.get('clean_title'):
-        return info['clean_title']
-
+    # 0. Strip all compound extensions (.zip.nomedia, .jpg, etc.)
     base_name = strip_all_extensions(filename_or_basename).strip()
     if not base_name:
         return ""
@@ -812,49 +672,24 @@ def extract_clean_title_prefix(filename_or_basename):
     return name if name else base_name
 
 
-def get_smart_name_destination(filename, random_root="Random", legacy_catchall=None):
+def get_name_sort_folder(filename, random_folder_name="Unsorted"):
     """
-    Central destination strategy function for Smart Name Sorter:
-      - Human: <Name>/
-      - Structured Camera/Video: <Camera/Prefix>/
-      - Platform Export: <Platform>/
-      - Random UUID: Random/UUID/
-      - Random Hash: Random/Hashes/
-      - Random Meta CDN: Random/Meta_CDN/
-      - Random Numeric: Random/Numeric_ID/
-      - Random Alphanumeric: Random/Alphanumeric/
-      - Unknown: Random/Unknown/
-    Returns (dest_subfolder: str, classification_info: dict).
-    """
-    info = classify_filename(filename)
-    if info['is_random']:
-        if legacy_catchall and str(legacy_catchall).strip() and legacy_catchall not in ('Random', 'None'):
-            return legacy_catchall, info
-
-        rtype = info.get('random_type') or 'unknown'
-        mapping = {
-            'uuid': 'UUID',
-            'hash': 'Hashes',
-            'meta_cdn': 'Meta_CDN',
-            'numeric_id': 'Numeric_ID',
-            'alphanumeric': 'Alphanumeric',
-            'unknown': 'Unknown'
-        }
-        sub = mapping.get(rtype, 'Unknown')
-        dest = f"{random_root}/{sub}"
-        return dest, info
-    else:
-        return info['clean_title'], info
-
-
-def get_name_sort_folder(filename, random_folder_name=None):
-    """
-    Computes destination subfolder for Smart Full-Name Matching mode.
+    Computes destination subfolder for Smart Full-Name Matching mode:
+      - If filename is flagged as machine-generated/hash-like: routes to single catch-all folder (e.g. 'Unsorted').
+      - Otherwise: strips date/timestamp/sequence suffixes to group related files (e.g. 'ANSHI-VID_...' -> 'ANSHI-VID/').
     Returns (folder_name: str, is_random: bool, reason: str).
     """
-    legacy_folder = random_folder_name if (random_folder_name and random_folder_name not in ('Random', 'Unsorted', 'None')) else None
-    dest, info = get_smart_name_destination(filename, random_root="Random", legacy_catchall=legacy_folder)
-    return dest, info['is_random'], info['reason']
+    is_random, reason = is_random_or_hash_name(filename)
+
+    if is_random:
+        folder_name = random_folder_name if (random_folder_name and str(random_folder_name).strip()) else "Unsorted"
+    else:
+        folder_name = extract_clean_title_prefix(filename)
+        if not folder_name:
+            base_name = os.path.splitext(os.path.basename(filename))[0].strip()
+            folder_name = base_name if base_name else "Unnamed"
+
+    return folder_name, is_random, reason
 
 
 def get_alphabetical_folder(filename):
@@ -871,7 +706,7 @@ def get_alphabetical_folder(filename):
         return "Symbols & Others"
 
 
-def get_destination_folder(base_folder, filepath, sort_category, date_source='ctime', structure_format='YYYY/MM', is_duplicate=False, isolate_duplicates=False, dest_folder=None, random_folder_name=None):
+def get_destination_folder(base_folder, filepath, sort_category, date_source='ctime', structure_format='YYYY/MM', is_duplicate=False, isolate_duplicates=False, dest_folder=None, random_folder_name="Unsorted"):
     """
     Generates target folder path depending on sort_category & optional custom dest_folder.
     """
@@ -910,9 +745,7 @@ def get_destination_folder(base_folder, filepath, sort_category, date_source='ct
 
     elif sort_category in ('smart_name', 'name', 'full_name'):
         folder_name, is_random, reason = get_name_sort_folder(filename, random_folder_name=random_folder_name)
-        # Normalize relative path separators for OS
-        dest_parts = folder_name.replace('/', os.sep).replace('\\', os.sep).split(os.sep)
-        return os.path.join(target_root, *dest_parts)
+        return os.path.join(target_root, folder_name)
 
     elif sort_category == 'alphabetical':
         alpha_folder = get_alphabetical_folder(filename)
@@ -1909,10 +1742,7 @@ def scan_directory_preview(
         if os.path.exists(fix_win_long_path(target_path)) and os.path.abspath(os.path.dirname(fp)) != os.path.abspath(target_dir):
             status_str = "WILL SKIP (Target Exists)"
 
-        classification_info = classify_filename(filename)
-        is_rand = classification_info['is_random']
-        rand_reason = classification_info['reason']
-        class_label = classification_info.get('classification_label', 'Human Name')
+        is_rand, rand_reason = is_random_or_hash_name(filename)
 
         preview_items.append({
             "filename": filename,
@@ -1927,9 +1757,7 @@ def scan_directory_preview(
             "is_duplicate": is_dup,
             "status_str": status_str,
             "is_random": is_rand,
-            "classification_reason": rand_reason,
-            "classification_label": class_label,
-            "classification_info": classification_info
+            "classification_reason": rand_reason
         })
 
     summary = {
@@ -2390,7 +2218,7 @@ def organize_by_name(
     folder,
     dest_folder=None,
     dry_run=True,
-    random_folder_name=None,
+    random_folder_name="Unsorted",
     mode='move',
     on_conflict='number',
     selected_files=None,
@@ -2401,11 +2229,12 @@ def organize_by_name(
 ):
     """
     Dedicated high-performance Smart Name Sorter:
-      1. Exact full-name matching (minus extension) - no prefix truncation.
+      1. Exact full-name matching (minus extension) — no prefix truncation.
          'ansh_true.jpg' -> 'ansh_true/' and 'ansh_rao.png' -> 'ansh_rao/'.
-      2. Structured random / machine-generated / hash subcategory routing (UUID, Hashes, Meta_CDN, Numeric_ID, Alphanumeric).
-      3. Preserves original casing for folder names.
-      4. Dry-run support by default, safe non-overwriting collision handling, and full audit logging.
+      2. Heuristic random / machine-generated / hash detection.
+      3. All random files routed to ONE shared catch-all folder (e.g. 'Unsorted').
+      4. Preserves original casing for folder names.
+      5. Dry-run support by default, safe non-overwriting collision handling, and full audit logging.
     """
     return organize_directory(
         main_folder=folder,
