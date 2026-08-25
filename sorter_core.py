@@ -512,6 +512,10 @@ def is_random_or_hash_name(filename_or_basename):
     if base_name.isdigit():
         return True, f"Short numeric machine ID ('{base_name}')"
 
+    # 2b. Separator-only or punctuation-only names like '_', '--', '__' - meaningless system artifacts
+    if re.match(r'^[\s_\-\.]+$', base_name):
+        return True, f"Separator/punctuation-only machine artifact ('{base_name}')"
+
     # 3. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars)
     if HEX_HASH_REGEX.match(base_name):
         return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
