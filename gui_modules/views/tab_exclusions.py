@@ -8,6 +8,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_exclusions_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_exclusions, fg_color="transparent")
@@ -16,7 +26,7 @@ def setup_exclusions_tab(gui_instance):
     gui_instance.exclusions_scroll = scroll
 
     # Header Card
-    hdr_card = ctk.CTkFrame(scroll, corner_radius=12)
+    hdr_card = ctk.CTkFrame(scroll, corner_radius=16)
     hdr_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     hdr_card.grid_columnconfigure(0, weight=1)
 
@@ -34,7 +44,7 @@ def setup_exclusions_tab(gui_instance):
     ).pack(anchor="w", padx=12, pady=(0, 6))
 
     # ── SECTION 1: EXCLUDED FOLDERS ──
-    fld_card = ctk.CTkFrame(scroll, corner_radius=12)
+    fld_card = ctk.CTkFrame(scroll, corner_radius=16)
     fld_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     fld_card.grid_columnconfigure(1, weight=1)
 
@@ -67,7 +77,7 @@ def setup_exclusions_tab(gui_instance):
         ctk.CTkButton(preset_fld_box, text=f"+ {p_name}", command=lambda n=p_name: _add_fld_preset(n), font=ctk.CTkFont(size=9), height=22, fg_color=("gray75", "gray30"), text_color=("gray10", "gray90")).pack(side="left", padx=2)
 
     # ── SECTION 2: EXCLUDED FILE NAMES ──
-    file_card = ctk.CTkFrame(scroll, corner_radius=12)
+    file_card = ctk.CTkFrame(scroll, corner_radius=16)
     file_card.grid(row=2, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     file_card.grid_columnconfigure(1, weight=1)
 
@@ -99,7 +109,7 @@ def setup_exclusions_tab(gui_instance):
         ctk.CTkButton(preset_file_box, text=f"+ {pf_name}", command=lambda n=pf_name: _add_file_preset(n), font=ctk.CTkFont(size=9), height=22, fg_color=("gray75", "gray30"), text_color=("gray10", "gray90")).pack(side="left", padx=2)
 
     # ── SECTION 3: EXCLUDED FILE EXTENSIONS ──
-    ext_card = ctk.CTkFrame(scroll, corner_radius=12)
+    ext_card = ctk.CTkFrame(scroll, corner_radius=16)
     ext_card.grid(row=3, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     ext_card.grid_columnconfigure(1, weight=1)
 
@@ -149,7 +159,7 @@ def setup_exclusions_tab(gui_instance):
             row_i += 1
 
     # ── SECTION 4: WINDOWS EXPLORER CONTEXT MENU INTEGRATION ──
-    ctx_card = ctk.CTkFrame(scroll, corner_radius=12)
+    ctx_card = ctk.CTkFrame(scroll, corner_radius=16)
     ctx_card.grid(row=4, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     ctx_card.grid_columnconfigure(1, weight=1)
 
@@ -185,7 +195,7 @@ def setup_exclusions_tab(gui_instance):
         text="➕ Add to Windows Right-Click Menu",
         command=_do_install_ctx,
         font=ctk.CTkFont(size=10, weight="bold"),
-        fg_color="#0288d1",
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1",
         height=32
     ).pack(side="left", padx=(0, 4))
 

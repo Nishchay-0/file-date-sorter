@@ -11,6 +11,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_organizer_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_organizer, fg_color="transparent")
@@ -19,25 +29,25 @@ def setup_organizer_tab(gui_instance):
     gui_instance.organizer_scroll = scroll
 
     if hasattr(gui_instance, 'StorageChartCanvas'):
-        gui_instance.chart_canvas = gui_instance.StorageChartCanvas(scroll, height=110, corner_radius=10, fg_color=("gray90", "gray16"))
+        gui_instance.chart_canvas = gui_instance.StorageChartCanvas(scroll, height=110, corner_radius=10, fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray16"))
         gui_instance.chart_canvas.grid(row=0, column=0, sticky="ew", pady=(0, 6))
 
     # Presets Bar
-    preset_card = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("gray90", "gray17"))
+    preset_card = ctk.CTkFrame(scroll, corner_radius=10, fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray17"))
     preset_card.grid(row=1, column=0, sticky="ew", pady=(0, 6), ipadx=8, ipady=4)
     ctk.CTkLabel(preset_card, text="⚡ Quick Presets:", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(12, 4))
     create_info_icon(preset_card, "1-Click Presets instantly configure sorting strategy, filters & date formats!").pack(side="left", padx=(0, 8))
 
-    btn1 = ctk.CTkButton(preset_card, text="📸 Photos & EXIF", command=gui_instance.apply_preset_photos, font=ctk.CTkFont(size=11), height=26, width=125, fg_color="#0288d1")
+    btn1 = ctk.CTkButton(preset_card, text="📸 Photos & EXIF", command=gui_instance.apply_preset_photos, font=ctk.CTkFont(size=11), height=26, width=125, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1")
     btn1.pack(side="left", padx=3)
 
-    btn2 = ctk.CTkButton(preset_card, text="📥 Downloads Clean", command=gui_instance.apply_preset_downloads, font=ctk.CTkFont(size=11), height=26, width=135, fg_color="#7b1fa2")
+    btn2 = ctk.CTkButton(preset_card, text="📥 Downloads Clean", command=gui_instance.apply_preset_downloads, font=ctk.CTkFont(size=11), height=26, width=135, fg_color=("#AF52DE", "#BF5AF2") if HAS_THEME else "#7b1fa2")
     btn2.pack(side="left", padx=3)
 
-    btn3 = ctk.CTkButton(preset_card, text="💼 Work Documents", command=gui_instance.apply_preset_documents, font=ctk.CTkFont(size=11), height=26, width=130, fg_color="#388e3c")
+    btn3 = ctk.CTkButton(preset_card, text="💼 Work Documents", command=gui_instance.apply_preset_documents, font=ctk.CTkFont(size=11), height=26, width=130, fg_color=("#34C759", "#30D158") if HAS_THEME else "#388e3c")
     btn3.pack(side="left", padx=3)
 
-    btn4 = ctk.CTkButton(preset_card, text="🧹 Big File Finder", command=gui_instance.apply_preset_size, font=ctk.CTkFont(size=11), height=26, width=120, fg_color="#f57c00")
+    btn4 = ctk.CTkButton(preset_card, text="🧹 Big File Finder", command=gui_instance.apply_preset_size, font=ctk.CTkFont(size=11), height=26, width=120, fg_color=("#FF9500", "#FF9F0A") if HAS_THEME else "#f57c00")
     btn4.pack(side="left", padx=3)
 
     # 2-Column Grid Container
@@ -47,7 +57,7 @@ def setup_organizer_tab(gui_instance):
     grid_cols.grid_columnconfigure(1, weight=1)
 
     # Col 0: Directories & Shortcuts Card
-    dir_card = ctk.CTkFrame(grid_cols, corner_radius=12)
+    dir_card = ctk.CTkFrame(grid_cols, corner_radius=16)
     dir_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5), ipadx=8, ipady=8)
     dir_card.grid_columnconfigure(1, weight=1)
 
@@ -69,7 +79,7 @@ def setup_organizer_tab(gui_instance):
             font=ctk.CTkFont(size=10),
             height=22,
             width=85,
-            fg_color=("gray80", "gray25"),
+            fg_color=GLASS["bg_hover"] if HAS_THEME else ("gray80", "gray25"),
             text_color=("gray10", "gray90")
         )
         btn_sc.pack(side="left", padx=2)
@@ -91,7 +101,7 @@ def setup_organizer_tab(gui_instance):
     gui_instance.browse_multi_btn.pack(side="left", padx=(0, 3))
     CTkToolTip(gui_instance.browse_multi_btn, "Pick multiple target folders sequentially to organize altogether!")
 
-    gui_instance.browse_files_btn = ctk.CTkButton(btn_box, text="📄 Pick Files...", command=gui_instance.browse_individual_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#00838f", height=32, width=90)
+    gui_instance.browse_files_btn = ctk.CTkButton(btn_box, text="📄 Pick Files...", command=gui_instance.browse_individual_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f", height=32, width=90)
     gui_instance.browse_files_btn.pack(side="left", padx=(0, 3))
     CTkToolTip(gui_instance.browse_files_btn, "Select specific individual files anywhere on your computer!")
 
@@ -133,7 +143,7 @@ def setup_organizer_tab(gui_instance):
     ctk.CTkButton(dest_btn_box, text="Clear", command=lambda: gui_instance.dest_dir_var.set(""), font=ctk.CTkFont(size=10), fg_color=("gray75", "gray30"), text_color=("gray10", "gray90"), height=32, width=55).pack(side="left")
 
     # Col 1: Strategy & Rules Card
-    strategy_card = ctk.CTkFrame(grid_cols, corner_radius=12)
+    strategy_card = ctk.CTkFrame(grid_cols, corner_radius=16)
     strategy_card.grid(row=0, column=1, sticky="nsew", padx=(5, 0), ipadx=8, ipady=8)
     strategy_card.grid_columnconfigure(1, weight=1)
     strategy_card.grid_columnconfigure(3, weight=1)
@@ -278,7 +288,7 @@ def setup_organizer_tab(gui_instance):
     gui_instance.conflict_dropdown.grid(row=4, column=1, columnspan=3, sticky="ew", padx=(0, 12), pady=4)
 
     # Exclusions & Filters Card
-    filter_card = ctk.CTkFrame(scroll, corner_radius=12)
+    filter_card = ctk.CTkFrame(scroll, corner_radius=16)
     filter_card.grid(row=3, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=6)
     filter_card.grid_columnconfigure(0, weight=0)
     filter_card.grid_columnconfigure(1, weight=1)
@@ -385,7 +395,7 @@ def setup_organizer_tab(gui_instance):
     gui_instance.custom_skipped_dest_var = tk.StringVar()
 
     # Live Preview Table
-    preview_card = ctk.CTkFrame(scroll, corner_radius=12)
+    preview_card = ctk.CTkFrame(scroll, corner_radius=16)
     preview_card.grid(row=4, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=6)
     preview_card.grid_columnconfigure(0, weight=1)
 
@@ -403,14 +413,14 @@ def setup_organizer_tab(gui_instance):
         preview_hdr, text="📋 Show Plan",
         command=gui_instance.show_smart_name_plan,
         font=ctk.CTkFont(size=11, weight="bold"),
-        height=28, width=110, fg_color="#7b1fa2"
+        height=28, width=110, fg_color=("#AF52DE", "#BF5AF2") if HAS_THEME else "#7b1fa2"
     )
     gui_instance.show_plan_btn.grid(row=0, column=3, sticky="e", padx=(0, 6))
     CTkToolTip(gui_instance.show_plan_btn, "Shows a pre-execution plan summary: proposed folders, Unsorted count, and files needing manual review — before anything is moved.")
     # Only show in Smart Name mode
     gui_instance.show_plan_btn.grid_remove()
 
-    gui_instance.scan_btn = ctk.CTkButton(preview_hdr, text="🔍 Scan Preview", command=gui_instance.refresh_preview, font=ctk.CTkFont(size=11, weight="bold"), height=28, width=120, fg_color="#0288d1")
+    gui_instance.scan_btn = ctk.CTkButton(preview_hdr, text="🔍 Scan Preview", command=gui_instance.refresh_preview, font=ctk.CTkFont(size=11, weight="bold"), height=28, width=120, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1")
     gui_instance.scan_btn.grid(row=0, column=4, sticky="e")
 
     tree_frame = ctk.CTkFrame(preview_card, corner_radius=8, fg_color=("gray95", "gray15"))
@@ -499,7 +509,7 @@ def setup_organizer_tab(gui_instance):
     gui_instance.progress_bar.grid(row=0, column=3, sticky="ew", padx=6)
 
     # Live Execution Console Log Card
-    log_card = ctk.CTkFrame(scroll, corner_radius=12)
+    log_card = ctk.CTkFrame(scroll, corner_radius=16)
     log_card.grid(row=6, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=6)
     log_card.grid_columnconfigure(0, weight=1)
 

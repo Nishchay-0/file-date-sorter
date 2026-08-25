@@ -47,11 +47,122 @@ try:
 except ImportError:
     HAS_CV2 = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button as _accent_btn,
+        secondary_button as _secondary_btn, status_badge as _status_badge,
+        styled_entry as _styled_entry, styled_progress as _styled_progress,
+        animate_hover, resolve_accent
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def get_user_folder(name):
     home = os.path.expanduser("~")
     path = os.path.join(home, name)
     return path if os.path.exists(path) else home
+
+
+# ---------------------------------------------------------------------------
+# Glass Component Helpers (Apple Glassmorphism wrappers)
+# ---------------------------------------------------------------------------
+
+class GlassCard:
+    """
+    Factory for a CTkFrame styled as a frosted glass panel.
+    Usage: frame = GlassCard.create(parent, corner_radius=16)
+    """
+    @staticmethod
+    def create(parent, corner_radius=16, border_width=1, **kw):
+        if not HAS_CUSTOMTKINTER:
+            return None
+        if HAS_THEME:
+            defaults = dict(
+                fg_color=GLASS["bg_card"],
+                border_color=GLASS["border"],
+                border_width=border_width,
+                corner_radius=corner_radius,
+            )
+        else:
+            defaults = dict(corner_radius=corner_radius)
+        defaults.update(kw)
+        return ctk.CTkFrame(parent, **defaults)
+
+
+class ActionButton:
+    """
+    Factory for themed action buttons with hover pulse animation.
+    Usage: btn = ActionButton.create(parent, "Sort Files", command=fn, accent="blue")
+    """
+    @staticmethod
+    def create(parent, text, command=None, accent="blue", width=120, height=32,
+               icon="", **kw):
+        if not HAS_CUSTOMTKINTER:
+            return None
+        if HAS_THEME:
+            return _accent_btn(parent, text, command=command, accent=accent,
+                               width=width, height=height, icon=icon, **kw)
+        # Fallback
+        label = f"{icon} {text}".strip() if icon else text
+        return ctk.CTkButton(parent, text=label, command=command,
+                             width=width, height=height, **kw)
+
+
+class StatusBadge:
+    """
+    Factory for pill-shaped status chip labels.
+    Usage: badge = StatusBadge.create(parent, "Windows 11", accent="blue")
+    """
+    @staticmethod
+    def create(parent, text, accent="blue", **kw):
+        if not HAS_CUSTOMTKINTER:
+            return None
+        if HAS_THEME:
+            return _status_badge(parent, text, accent=accent, **kw)
+        return ctk.CTkLabel(parent, text=f"  {text}  ",
+                            font=ctk.CTkFont(size=10, weight="bold"),
+                            fg_color="#007AFF", text_color="white",
+                            corner_radius=20, **kw)
+
+
+class FolderPicker:
+    """
+    Unified folder/file picker row: glass entry + Browse button.
+    Usage:
+        picker = FolderPicker(parent, textvariable=my_var, command=browse_fn)
+        picker.pack(fill='x', padx=10, pady=4)
+    """
+    def __init__(self, parent, textvariable=None, command=None,
+                 placeholder="Select folder...", label="", accent="blue"):
+        self.frame = ctk.CTkFrame(parent, fg_color="transparent")
+        if label:
+            ctk.CTkLabel(
+                self.frame, text=label,
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold")
+            ).pack(side="left", padx=(0, 6))
+
+        entry_kw = dict(textvariable=textvariable, placeholder_text=placeholder,
+                        font=ctk.CTkFont(size=11), height=32)
+        if HAS_THEME:
+            entry_kw.update(corner_radius=8, border_width=1,
+                            border_color=GLASS["border"], fg_color=GLASS["bg_card"])
+        self.entry = ctk.CTkEntry(self.frame, **entry_kw)
+        self.entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+        btn_kw = dict(text="📂 Browse", command=command, width=90, height=32)
+        if HAS_THEME:
+            fg_l, fg_d = resolve_accent(accent)
+            btn_kw.update(fg_color=(fg_l, fg_d), corner_radius=10)
+        self.btn = ctk.CTkButton(self.frame, **btn_kw)
+        self.btn.pack(side="left")
+
+    def pack(self, **kw):
+        self.frame.pack(**kw)
+
+    def grid(self, **kw):
+        self.frame.grid(**kw)
 
 
 class CTkToolTip:

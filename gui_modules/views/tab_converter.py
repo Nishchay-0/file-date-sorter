@@ -8,6 +8,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_converter_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_converter, fg_color="transparent")
@@ -15,7 +25,7 @@ def setup_converter_tab(gui_instance):
     scroll.grid_columnconfigure(0, weight=1)
     gui_instance.converter_scroll = scroll
 
-    conv_hdr_card = ctk.CTkFrame(scroll, corner_radius=12)
+    conv_hdr_card = ctk.CTkFrame(scroll, corner_radius=16)
     conv_hdr_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     conv_hdr_card.grid_columnconfigure(1, weight=1)
 
@@ -34,7 +44,7 @@ def setup_converter_tab(gui_instance):
     conv_btn_box.grid(row=1, column=2, sticky="e", padx=(0, 12), pady=4)
 
     ctk.CTkButton(conv_btn_box, text="📁 Pick Folder...", command=gui_instance.browse_conv_folder, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=105).pack(side="left", padx=(0, 3))
-    ctk.CTkButton(conv_btn_box, text="📄 Pick Files...", command=gui_instance.browse_conv_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#00838f", height=32, width=95).pack(side="left")
+    ctk.CTkButton(conv_btn_box, text="📄 Pick Files...", command=gui_instance.browse_conv_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f", height=32, width=95).pack(side="left")
 
     ctk.CTkLabel(conv_hdr_card, text="Export Output (Opt):", font=ctk.CTkFont(size=11, weight="bold")).grid(row=2, column=0, sticky="w", padx=(12, 6), pady=4)
 
@@ -44,7 +54,7 @@ def setup_converter_tab(gui_instance):
 
     ctk.CTkButton(conv_hdr_card, text="📂 Export Folder...", command=gui_instance.browse_conv_dest, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#4527a0", height=32, width=120).grid(row=2, column=2, sticky="e", padx=(0, 12), pady=4)
 
-    conv_opt_card = ctk.CTkFrame(scroll, corner_radius=12)
+    conv_opt_card = ctk.CTkFrame(scroll, corner_radius=16)
     conv_opt_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     conv_opt_card.grid_columnconfigure(1, weight=1)
 
@@ -100,7 +110,7 @@ def setup_converter_tab(gui_instance):
     gui_instance.conv_threads_dropdown.grid(row=1, column=1, sticky="w", padx=(0, 12), pady=6)
 
 
-    conv_prev_card = ctk.CTkFrame(scroll, corner_radius=12)
+    conv_prev_card = ctk.CTkFrame(scroll, corner_radius=16)
     conv_prev_card.grid(row=2, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=6)
     conv_prev_card.grid_columnconfigure(0, weight=1)
 
@@ -157,7 +167,7 @@ def setup_converter_tab(gui_instance):
     )
     gui_instance.conv_stats_lbl.grid(row=2, column=0, sticky="w", padx=12, pady=(2, 6))
 
-    conv_act_card = ctk.CTkFrame(scroll, corner_radius=12)
+    conv_act_card = ctk.CTkFrame(scroll, corner_radius=16)
     conv_act_card.grid(row=3, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     conv_act_card.grid_columnconfigure(1, weight=1)
 

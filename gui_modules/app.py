@@ -77,6 +77,17 @@ try:
 except ImportError:
     HAS_PIL = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, apply_glass_theme,
+        glass_frame, accent_button, secondary_button,
+        section_label, status_badge, styled_entry,
+        styled_progress, animate_hover, resolve_accent
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 if HAS_CUSTOMTKINTER:
     class StorageChartCanvas(ctk.CTkFrame):
@@ -109,7 +120,7 @@ if HAS_CUSTOMTKINTER:
             hdr = ctk.CTkLabel(self.bars_frame, text="📊 File Category Distribution", font=ctk.CTkFont(size=11, weight="bold"))
             hdr.pack(anchor="w", pady=(0, 4))
 
-            colors = ["#0288d1", "#7b1fa2", "#388e3c", "#f57c00", "#d32f2f", "#00838f", "#5d4037", "#455a64"]
+            colors = ["#0A84FF", "#BF5AF2", "#30D158", "#FF9F0A", "#FF453A", "#64D2FF", "#FF6B35", "#5E5CE6"]
 
             row = 0
             for cat, count in category_counts.items():
@@ -163,8 +174,12 @@ if HAS_CUSTOMTKINTER:
             self.geometry(f"{app_w}x{app_h}+{pos_x}+{pos_y}")
             self.minsize(920, 560)
 
-            ctk.set_appearance_mode("Dark")
-            ctk.set_default_color_theme("blue")
+            # Apply Apple Glassmorphism theme
+            if HAS_THEME:
+                apply_glass_theme("dark")
+            else:
+                ctk.set_appearance_mode("Dark")
+                ctk.set_default_color_theme("blue")
 
             if sys.platform == 'win32':
                 try:
@@ -402,57 +417,96 @@ if HAS_CUSTOMTKINTER:
             self.open_system_vault_restore_manager()
 
         def setup_ui(self):
-            # Top Banner Card
-            top_card = ctk.CTkFrame(self, corner_radius=12, fg_color=("gray85", "gray18"))
-            top_card.pack(fill="x", padx=10, pady=(6, 3), ipadx=6, ipady=3)
+            # ── Apple Glassmorphism Top Banner ─────────────────────────────────
+            top_card = ctk.CTkFrame(
+                self,
+                corner_radius=16,
+                fg_color=GLASS["bg_card"] if HAS_THEME else ("gray85", "gray18"),
+                border_color=GLASS["border"] if HAS_THEME else ("gray70", "gray30"),
+                border_width=1
+            )
+            top_card.pack(fill="x", padx=10, pady=(8, 4), ipadx=8, ipady=6)
             top_card.grid_columnconfigure(0, weight=1)
 
+            # Title row
             title_frame = ctk.CTkFrame(top_card, fg_color="transparent")
-            title_frame.grid(row=0, column=0, sticky="w", padx=10)
+            title_frame.grid(row=0, column=0, sticky="w", padx=14, pady=(2, 0))
 
             title_lbl = ctk.CTkLabel(
                 title_frame,
-                text="📁 Smart File Organizer Suite Pro v4.0",
-                font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold")
+                text="⬡  Smart File Organizer Suite",
+                font=ctk.CTkFont(family="Segoe UI", size=19, weight="bold"),
+                text_color=GLASS["text_primary"] if HAS_THEME else None
             )
             title_lbl.pack(side="left")
 
-            badge = ctk.CTkLabel(
-                title_frame,
-                text="  Windows 11 Certified  ",
-                font=ctk.CTkFont(size=10, weight="bold"),
-                fg_color="#0288d1",
-                text_color="white",
-                corner_radius=6
-            )
-            badge.pack(side="left", padx=8)
+            # Feature pill badges
+            badges_frame = ctk.CTkFrame(top_card, fg_color="transparent")
+            badges_frame.grid(row=1, column=0, sticky="w", padx=14, pady=(2, 2))
 
-            sub_lbl = ctk.CTkLabel(
-                top_card,
-                text="Zero-Deletion Guarantee • EXIF Camera Support • Windows 11 Side-by-Side Conflict Resolver • Multi-Folder Extraction",
-                font=ctk.CTkFont(size=10),
-                text_color="gray60"
-            )
-            sub_lbl.grid(row=1, column=0, sticky="w", padx=10, pady=(1, 0))
+            badge_defs = [
+                ("🛡️ Zero-Deletion", "blue"),
+                ("📸 EXIF Camera", "teal"),
+                ("⚡ Win 11 Ready", "purple"),
+                ("🔒 Cloud Safe", "green"),
+            ]
+            for badge_text, badge_accent in badge_defs:
+                if HAS_THEME:
+                    b = status_badge(badges_frame, badge_text, accent=badge_accent)
+                else:
+                    b = ctk.CTkLabel(badges_frame, text=f"  {badge_text}  ",
+                                     font=ctk.CTkFont(size=10, weight="bold"),
+                                     fg_color="#0288d1", text_color="white", corner_radius=20)
+                b.pack(side="left", padx=(0, 6))
 
+            # Theme toggle — segmented button (Dark / Light)
             theme_box = ctk.CTkFrame(top_card, fg_color="transparent")
-            theme_box.grid(row=0, column=1, rowspan=2, sticky="e", padx=10)
+            theme_box.grid(row=0, column=1, rowspan=2, sticky="e", padx=14)
 
-            self.theme_switch = ctk.CTkSwitch(
+            self.theme_seg = ctk.CTkSegmentedButton(
                 theme_box,
-                text="🌙 Dark Mode",
-                command=self.toggle_theme,
-                font=ctk.CTkFont(size=10, weight="bold")
+                values=["🌙 Dark", "☀️ Light"],
+                command=self._on_theme_seg_changed,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                corner_radius=10,
+                height=30,
             )
-            self.theme_switch.select()
-            self.theme_switch.pack(side="right")
+            self.theme_seg.set("🌙 Dark")
+            self.theme_seg.pack(side="right")
 
-            # Main Card Container
-            main_card = ctk.CTkFrame(self, corner_radius=12)
+            # Keep backward-compat: create a dummy theme_switch-like object
+            class _DummySwitch:
+                def get(self_inner):
+                    return 1 if ctk.get_appearance_mode() == "Dark" else 0
+                def select(self_inner):
+                    pass
+            self.theme_switch = _DummySwitch()
+
+            # ── Main Glass Container ───────────────────────────────────────────
+            main_card = ctk.CTkFrame(
+                self,
+                corner_radius=16,
+                fg_color=GLASS["bg_card_alt"] if HAS_THEME else None,
+                border_color=GLASS["border"] if HAS_THEME else None,
+                border_width=1 if HAS_THEME else 0
+            )
             main_card.pack(fill="both", expand=True, padx=10, pady=(0, 4))
 
-            # 9-Tab Navigation View
-            self.tabview = ctk.CTkTabview(main_card, corner_radius=10, command=self._on_tab_changed)
+            # ── Tab Navigation View ────────────────────────────────────────────
+            self.tabview = ctk.CTkTabview(
+                main_card,
+                corner_radius=12,
+                command=self._on_tab_changed,
+                fg_color=GLASS["bg_card"] if HAS_THEME else None,
+                border_color=GLASS["border"] if HAS_THEME else None,
+                border_width=1 if HAS_THEME else 0,
+                segmented_button_fg_color=GLASS["bg_card_alt"] if HAS_THEME else None,
+                segmented_button_selected_color=GLASS["accent_blue_dk"] if HAS_THEME else None,
+                segmented_button_selected_hover_color=GLASS["accent_blue"] if HAS_THEME else None,
+                segmented_button_unselected_color=GLASS["bg_card_alt"] if HAS_THEME else None,
+                segmented_button_unselected_hover_color=GLASS["bg_hover"] if HAS_THEME else None,
+                text_color=GLASS["text_primary"] if HAS_THEME else None,
+            )
             self.tabview.pack(fill="both", expand=True, padx=4, pady=4)
 
             self.tab_organizer = self.tabview.add("📅 File Organizer")
@@ -472,7 +526,7 @@ if HAS_CUSTOMTKINTER:
             setup_organizer_tab(self)
             self._tabs_loaded["organizer"] = True
 
-            # Auto-set target directory if launched via CLI or Windows Explorer Right-Click Context Menu
+            # Auto-set target directory if launched via CLI or Windows Explorer
             if len(sys.argv) > 1:
                 arg_target = sys.argv[1].strip().strip('"')
                 if arg_target and os.path.exists(fix_win_long_path(arg_target)):
@@ -483,13 +537,35 @@ if HAS_CUSTOMTKINTER:
                     else:
                         self.set_target_dir(arg_target)
 
-            # Bottom Status Bar
-            status_card = ctk.CTkFrame(self, height=32, corner_radius=8)
-            status_card.pack(fill="x", padx=15, pady=(0, 10))
+            # ── Glass Status Bar ───────────────────────────────────────────────
+            status_card = ctk.CTkFrame(
+                self,
+                height=34,
+                corner_radius=10,
+                fg_color=GLASS["bg_card"] if HAS_THEME else None,
+                border_color=GLASS["border_accent"] if HAS_THEME else None,
+                border_width=1 if HAS_THEME else 0
+            )
+            status_card.pack(fill="x", padx=10, pady=(0, 8))
 
-            self.status_var = tk.StringVar(value="Ready. Select target folder or pick specific files to begin.")
-            self.status_lbl = ctk.CTkLabel(status_card, textvariable=self.status_var, font=ctk.CTkFont(size=11), anchor="w")
-            self.status_lbl.pack(side="left", padx=12, fill="x", expand=True)
+            # Accent left stripe
+            if HAS_THEME:
+                stripe = ctk.CTkFrame(status_card, width=4, corner_radius=0,
+                                      fg_color=GLASS["border_accent"])
+                stripe.pack(side="left", fill="y")
+
+            self.status_var = tk.StringVar(value="✦ Ready — select a target folder or pick files to begin.")
+            self.status_lbl = ctk.CTkLabel(
+                status_card,
+                textvariable=self.status_var,
+                font=ctk.CTkFont(family="Segoe UI", size=11),
+                anchor="w",
+                text_color=GLASS["text_secondary"] if HAS_THEME else None
+            )
+            self.status_lbl.pack(side="left", padx=10, fill="x", expand=True)
+
+            # Start idle pulse animation on status dot
+            self._start_status_pulse()
 
         def _atomic_repaint_tab_widgets(self, tab_container=None):
             """
@@ -4666,11 +4742,40 @@ if HAS_CUSTOMTKINTER:
             self.on_category_changed()
             self.refresh_preview()
 
-        def toggle_theme(self):
-            if self.theme_switch.get() == 1:
+        def _on_theme_seg_changed(self, value):
+            """Handle segmented theme toggle (Dark / Light)."""
+            if "Dark" in value:
                 ctk.set_appearance_mode("Dark")
             else:
                 ctk.set_appearance_mode("Light")
+
+        def toggle_theme(self):
+            """Legacy toggle_theme kept for backward compatibility."""
+            mode = ctk.get_appearance_mode()
+            if mode == "Dark":
+                ctk.set_appearance_mode("Light")
+                if hasattr(self, 'theme_seg'):
+                    self.theme_seg.set("☀️ Light")
+            else:
+                ctk.set_appearance_mode("Dark")
+                if hasattr(self, 'theme_seg'):
+                    self.theme_seg.set("🌙 Dark")
+
+        def _start_status_pulse(self):
+            """Animate a subtle pulsing dot in the status bar when idle."""
+            self._pulse_state = True
+            def _pulse():
+                try:
+                    if not hasattr(self, 'status_var'):
+                        return
+                    current = self.status_var.get()
+                    if current.startswith("✦") or current.startswith("·"):
+                        dot = "✦" if self._pulse_state else "·"
+                        self._pulse_state = not self._pulse_state
+                        self.after(1800, _pulse)
+                except Exception:
+                    pass
+            self.after(1800, _pulse)
 
         def on_category_changed(self, choice=None):
             cat = self.sort_category_var.get()

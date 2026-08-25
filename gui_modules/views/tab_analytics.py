@@ -10,6 +10,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_insights_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_insights, fg_color="transparent")
@@ -17,7 +27,7 @@ def setup_insights_tab(gui_instance):
     scroll.grid_columnconfigure(0, weight=1)
     gui_instance.insights_scroll = scroll
 
-    hdr_card = ctk.CTkFrame(scroll, corner_radius=12)
+    hdr_card = ctk.CTkFrame(scroll, corner_radius=16)
     hdr_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     hdr_card.grid_columnconfigure(1, weight=1)
 
@@ -43,12 +53,12 @@ def setup_insights_tab(gui_instance):
         text="📊 Analyze Storage",
         command=gui_instance.run_insights_analysis,
         font=ctk.CTkFont(size=11, weight="bold"),
-        fg_color="#0288d1",
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1",
         height=32,
         width=140
     ).pack(side="left")
 
-    gui_instance.insights_dashboard = ctk.CTkFrame(scroll, corner_radius=12)
+    gui_instance.insights_dashboard = ctk.CTkFrame(scroll, corner_radius=16)
     gui_instance.insights_dashboard.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=12, ipady=12)
     gui_instance.insights_dashboard.grid_columnconfigure(0, weight=1)
 

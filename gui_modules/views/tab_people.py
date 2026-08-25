@@ -27,6 +27,16 @@ except ImportError:
     HAS_CUSTOMTKINTER = False
 
 try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
+try:
     from PIL import Image, ImageTk
     HAS_PIL = True
 except ImportError:
@@ -47,7 +57,7 @@ def setup_people_tab(gui_instance):
     gui_instance.people_selected_clusters = set()
 
     # ── HEADER CARD ──
-    hdr_card = ctk.CTkFrame(scroll, corner_radius=12)
+    hdr_card = ctk.CTkFrame(scroll, corner_radius=16)
     hdr_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     hdr_card.grid_columnconfigure(0, weight=1)
 
@@ -65,7 +75,7 @@ def setup_people_tab(gui_instance):
     ).pack(anchor="w", padx=12, pady=(0, 6))
 
     # ── SECTION 1: SCAN CONTROLS ──
-    scan_card = ctk.CTkFrame(scroll, corner_radius=12)
+    scan_card = ctk.CTkFrame(scroll, corner_radius=16)
     scan_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     scan_card.grid_columnconfigure(1, weight=1)
 
@@ -87,7 +97,7 @@ def setup_people_tab(gui_instance):
 
     ctk.CTkButton(btn_box, text="📁 Pick Folder...", command=_browse_dir, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=105).pack(side="left", padx=(0, 4))
     
-    gui_instance.people_scan_btn = ctk.CTkButton(btn_box, text="🔍 Start People Scan", command=lambda: _start_people_scan(gui_instance), font=ctk.CTkFont(size=10, weight="bold"), height=32, width=135, fg_color="#0288d1")
+    gui_instance.people_scan_btn = ctk.CTkButton(btn_box, text="🔍 Start People Scan", command=lambda: _start_people_scan(gui_instance), font=ctk.CTkFont(size=10, weight="bold"), height=32, width=135, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1")
     gui_instance.people_scan_btn.pack(side="left")
 
     # Progress Indicator
@@ -103,7 +113,7 @@ def setup_people_tab(gui_instance):
     gui_instance.people_status_lbl.grid(row=1, column=0, sticky="w")
 
     # ── SECTION 2: SEARCH, SORT & FILTER TOOLBAR ──
-    review_card = ctk.CTkFrame(scroll, corner_radius=12)
+    review_card = ctk.CTkFrame(scroll, corner_radius=16)
     review_card.grid(row=2, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     review_card.grid_columnconfigure(0, weight=1)
 
@@ -166,7 +176,7 @@ def setup_people_tab(gui_instance):
     gui_instance.people_grid_frame.grid_columnconfigure(1, weight=1)
 
     # ── SECTION 3: ACTION BAR ──
-    act_card = ctk.CTkFrame(scroll, corner_radius=12)
+    act_card = ctk.CTkFrame(scroll, corner_radius=16)
     act_card.grid(row=3, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     act_card.grid_columnconfigure(0, weight=1)
 

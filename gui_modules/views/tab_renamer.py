@@ -9,6 +9,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_renamer_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_renamer, fg_color="transparent")
@@ -16,7 +26,7 @@ def setup_renamer_tab(gui_instance):
     scroll.grid_columnconfigure(0, weight=1)
     gui_instance.renamer_scroll = scroll
 
-    ren_dir_card = ctk.CTkFrame(scroll, corner_radius=12)
+    ren_dir_card = ctk.CTkFrame(scroll, corner_radius=16)
     ren_dir_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     ren_dir_card.grid_columnconfigure(1, weight=1)
 
@@ -36,7 +46,7 @@ def setup_renamer_tab(gui_instance):
 
     ctk.CTkButton(ren_btn_box, text="📁 Pick Folder...", command=gui_instance.browse_ren_dir, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=95).pack(side="left", padx=(0, 3))
     ctk.CTkButton(ren_btn_box, text="📁+ Multi Folders...", command=lambda: gui_instance.browse_multiple_folders(gui_instance.ren_dir_var, gui_instance.refresh_renamer_preview), font=ctk.CTkFont(size=10, weight="bold"), fg_color="#1565c0", height=32, width=110).pack(side="left", padx=(0, 3))
-    ctk.CTkButton(ren_btn_box, text="📄 Pick Files...", command=gui_instance.browse_ren_individual_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#00838f", height=32, width=90).pack(side="left")
+    ctk.CTkButton(ren_btn_box, text="📄 Pick Files...", command=gui_instance.browse_ren_individual_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f", height=32, width=90).pack(side="left")
 
     # Dedicated Exclusions Row
     ctk.CTkLabel(ren_dir_card, text="Exclusions (Opt):", font=ctk.CTkFont(size=11, weight="bold"), text_color="#ef5350").grid(row=2, column=0, sticky="w", padx=(12, 6), pady=4)
@@ -51,7 +61,7 @@ def setup_renamer_tab(gui_instance):
     ctk.CTkButton(ren_exc_btn_box, text="🚫 Except Files...", command=gui_instance.add_exclude_file_picker, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#ad1457", height=32, width=95).pack(side="left", padx=(0, 3))
     ctk.CTkButton(ren_exc_btn_box, text="🧹 Clear", command=lambda: gui_instance.exclude_folders_var.set(""), font=ctk.CTkFont(size=10), height=32, width=55, fg_color=("gray75", "gray30"), text_color=("gray10", "gray90")).pack(side="left")
 
-    rules_card = ctk.CTkFrame(scroll, corner_radius=12)
+    rules_card = ctk.CTkFrame(scroll, corner_radius=16)
     rules_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     rules_card.grid_columnconfigure(1, weight=1)
     rules_card.grid_columnconfigure(3, weight=1)
@@ -109,7 +119,7 @@ def setup_renamer_tab(gui_instance):
     gui_instance.ren_suffix_entry.grid(row=3, column=3, sticky="ew", padx=(0, 12), pady=4)
     gui_instance.ren_suffix_var.trace_add("write", lambda *args: gui_instance.refresh_renamer_preview())
 
-    ren_preview_card = ctk.CTkFrame(scroll, corner_radius=12)
+    ren_preview_card = ctk.CTkFrame(scroll, corner_radius=16)
     ren_preview_card.grid(row=2, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=6)
     ren_preview_card.grid_columnconfigure(0, weight=1)
 
@@ -122,7 +132,7 @@ def setup_renamer_tab(gui_instance):
     gui_instance.ren_stats_lbl = ctk.CTkLabel(ren_hdr, text="Files to Rename: 0", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray60")
     gui_instance.ren_stats_lbl.grid(row=0, column=1, sticky="e", padx=(0, 8))
 
-    ctk.CTkButton(ren_hdr, text="🔍 Refresh Map", command=gui_instance.refresh_renamer_preview, font=ctk.CTkFont(size=11, weight="bold"), height=28, width=120, fg_color="#0288d1").grid(row=0, column=2, sticky="e")
+    ctk.CTkButton(ren_hdr, text="🔍 Refresh Map", command=gui_instance.refresh_renamer_preview, font=ctk.CTkFont(size=11, weight="bold"), height=28, width=120, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1").grid(row=0, column=2, sticky="e")
 
     tree_frame = ctk.CTkFrame(ren_preview_card, corner_radius=8, fg_color=("gray95", "gray15"))
     tree_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))

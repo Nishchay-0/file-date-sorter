@@ -9,6 +9,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_extractor_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_extractor, fg_color="transparent")
@@ -16,7 +26,7 @@ def setup_extractor_tab(gui_instance):
     scroll.grid_columnconfigure(0, weight=1)
     gui_instance.extractor_scroll = scroll
 
-    ext_preset_card = ctk.CTkFrame(scroll, corner_radius=10, fg_color=("gray90", "gray17"))
+    ext_preset_card = ctk.CTkFrame(scroll, corner_radius=10, fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray17"))
     ext_preset_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=4)
     ctk.CTkLabel(ext_preset_card, text="⚡ Extraction Presets:", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(12, 4))
     create_info_icon(ext_preset_card, "Extract specific file types (e.g. ONLY PDFs or EXCEPT Media) out of subfolders into a single output directory!").pack(side="left", padx=(0, 6))
@@ -27,7 +37,7 @@ def setup_extractor_tab(gui_instance):
     btn_only_office = ctk.CTkButton(ext_preset_card, text="📝 ONLY Office Docs", command=gui_instance.preset_only_office_docs, font=ctk.CTkFont(size=11, weight="bold"), height=26, fg_color="#2e7d32")
     btn_only_office.pack(side="left", padx=3)
 
-    btn_only_media = ctk.CTkButton(ext_preset_card, text="🖼️ ONLY Photos & Videos", command=gui_instance.preset_only_media, font=ctk.CTkFont(size=11, weight="bold"), height=26, fg_color="#0288d1")
+    btn_only_media = ctk.CTkButton(ext_preset_card, text="🖼️ ONLY Photos & Videos", command=gui_instance.preset_only_media, font=ctk.CTkFont(size=11, weight="bold"), height=26, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1")
     btn_only_media.pack(side="left", padx=3)
 
     btn_exc1 = ctk.CTkButton(ext_preset_card, text="🚫 Except Photos & Videos", command=gui_instance.preset_except_media, font=ctk.CTkFont(size=11, weight="bold"), height=26, fg_color="#6a1b9a")
@@ -36,7 +46,7 @@ def setup_extractor_tab(gui_instance):
     ctk.CTkButton(ext_preset_card, text="🧹 Clear All", command=gui_instance.preset_clear_extractor_checkboxes, font=ctk.CTkFont(size=10), height=26, width=65, fg_color=("gray75", "gray30"), text_color=("gray10", "gray90")).pack(side="left", padx=3)
 
     # Directories Card WITH DUAL FILE & FOLDER PICKER!
-    ext_dir_card = ctk.CTkFrame(scroll, corner_radius=12)
+    ext_dir_card = ctk.CTkFrame(scroll, corner_radius=16)
     ext_dir_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     ext_dir_card.grid_columnconfigure(1, weight=1)
 
@@ -53,7 +63,7 @@ def setup_extractor_tab(gui_instance):
 
     ctk.CTkButton(ext_btn_box, text="📁 Pick Folder...", command=gui_instance.browse_ext_src, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=95).pack(side="left", padx=(0, 3))
     ctk.CTkButton(ext_btn_box, text="📁+ Multi Folders...", command=lambda: gui_instance.browse_multiple_folders(gui_instance.ext_src_var, gui_instance.refresh_extractor_preview), font=ctk.CTkFont(size=10, weight="bold"), fg_color="#1565c0", height=32, width=110).pack(side="left", padx=(0, 3))
-    ctk.CTkButton(ext_btn_box, text="📄 Pick Files...", command=gui_instance.browse_ext_individual_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#00838f", height=32, width=90).pack(side="left")
+    ctk.CTkButton(ext_btn_box, text="📄 Pick Files...", command=gui_instance.browse_ext_individual_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f", height=32, width=90).pack(side="left")
 
     # Dedicated Exclusions Row
     ctk.CTkLabel(ext_dir_card, text="Exclusions (Opt):", font=ctk.CTkFont(size=11, weight="bold"), text_color="#ef5350").grid(row=2, column=0, sticky="w", padx=(12, 6), pady=4)
@@ -77,7 +87,7 @@ def setup_extractor_tab(gui_instance):
     ctk.CTkButton(ext_dir_card, text="Browse...", command=gui_instance.browse_ext_dest, font=ctk.CTkFont(size=11), height=32, width=95).grid(row=3, column=2, sticky="e", padx=(0, 12), pady=4)
 
     # Strategy & Filter Card
-    ext_strat_card = ctk.CTkFrame(scroll, corner_radius=12)
+    ext_strat_card = ctk.CTkFrame(scroll, corner_radius=16)
     ext_strat_card.grid(row=2, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     ext_strat_card.grid_columnconfigure(1, weight=1)
     ext_strat_card.grid_columnconfigure(3, weight=1)
@@ -134,7 +144,7 @@ def setup_extractor_tab(gui_instance):
     sel_toolbar.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
     ctk.CTkLabel(sel_toolbar, text="Quick:", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray60").pack(side="left", padx=(0, 6))
     ctk.CTkButton(sel_toolbar, text="☑ Select All Categories", command=gui_instance.extractor_select_all_cats,
-        font=ctk.CTkFont(size=10), height=22, width=145, fg_color="#0288d1").pack(side="left", padx=(0, 4))
+        font=ctk.CTkFont(size=10), height=22, width=145, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1").pack(side="left", padx=(0, 4))
     ctk.CTkButton(sel_toolbar, text="☐ Clear All", command=gui_instance.extractor_clear_all_cats,
         font=ctk.CTkFont(size=10), height=22, width=80,
         fg_color=("gray72", "gray32"), text_color=("gray10", "gray90")).pack(side="left", padx=(0, 4))
@@ -180,7 +190,7 @@ def setup_extractor_tab(gui_instance):
         ctk.CTkLabel(sub_lbl_row, text="Extensions:", font=ctk.CTkFont(size=9, weight="bold"), text_color="gray60").pack(side="left")
         ctk.CTkButton(sub_lbl_row, text="All", width=28, height=16, font=ctk.CTkFont(size=9),
             command=lambda lbl=type_label: gui_instance._sub_select_all(lbl),
-            fg_color="#0288d1").pack(side="right", padx=1)
+            fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1").pack(side="right", padx=1)
         ctk.CTkButton(sub_lbl_row, text="None", width=32, height=16, font=ctk.CTkFont(size=9),
             command=lambda lbl=type_label: gui_instance._sub_select_none(lbl),
             fg_color=("gray72","gray32"), text_color=("gray10","gray80")).pack(side="right", padx=1)
@@ -243,7 +253,7 @@ def setup_extractor_tab(gui_instance):
         text="🔍 Detect All Exts in Folder...",
         command=gui_instance.open_custom_ext_detector,
         font=ctk.CTkFont(size=10, weight="bold"),
-        fg_color="#0288d1",
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1",
         hover_color="#0277bd",
         height=28,
         width=175
@@ -319,7 +329,7 @@ def setup_extractor_tab(gui_instance):
     gui_instance.ext_skipped_dropdown.pack(side="left", padx=(0, 8))
     CTkToolTip(gui_instance.ext_skipped_dropdown, "Controls what happens to files that are NOT extracted or skipped:\n• Leave in Original Location: Untouched files stay right where they are.\n• Move Skipped Files: Gathers all unextracted/skipped files into a '_Skipped_Files' folder.")
 
-    ext_preview_card = ctk.CTkFrame(scroll, corner_radius=12)
+    ext_preview_card = ctk.CTkFrame(scroll, corner_radius=16)
     ext_preview_card.grid(row=3, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=6)
     ext_preview_card.grid_columnconfigure(0, weight=1)
 
@@ -332,7 +342,7 @@ def setup_extractor_tab(gui_instance):
     gui_instance.ext_preview_stats_lbl = ctk.CTkLabel(ext_preview_hdr, text="Matching Files: 0 | Total Size: 0 B", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray60")
     gui_instance.ext_preview_stats_lbl.grid(row=0, column=1, sticky="e", padx=(0, 8))
 
-    ctk.CTkButton(ext_preview_hdr, text="🔍 Scan Extractor Map", command=gui_instance.refresh_extractor_preview, font=ctk.CTkFont(size=11, weight="bold"), height=28, width=150, fg_color="#0288d1").grid(row=0, column=2, sticky="e")
+    ctk.CTkButton(ext_preview_hdr, text="🔍 Scan Extractor Map", command=gui_instance.refresh_extractor_preview, font=ctk.CTkFont(size=11, weight="bold"), height=28, width=150, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1").grid(row=0, column=2, sticky="e")
 
     tree_frame = ctk.CTkFrame(ext_preview_card, corner_radius=8, fg_color=("gray95", "gray15"))
     tree_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))

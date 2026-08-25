@@ -7,6 +7,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_watcher_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_watcher, fg_color="transparent")
@@ -14,7 +24,7 @@ def setup_watcher_tab(gui_instance):
     scroll.grid_columnconfigure(0, weight=1)
     gui_instance.watcher_scroll = scroll
 
-    wtc_card = ctk.CTkFrame(scroll, corner_radius=12)
+    wtc_card = ctk.CTkFrame(scroll, corner_radius=16)
     wtc_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     wtc_card.grid_columnconfigure(1, weight=1)
 
@@ -82,7 +92,7 @@ def setup_watcher_tab(gui_instance):
     gui_instance.wtc_status_lbl.pack(side="left", padx=8)
 
     # Session Stats Card
-    stats_card = ctk.CTkFrame(scroll, corner_radius=12)
+    stats_card = ctk.CTkFrame(scroll, corner_radius=16)
     stats_card.grid(row=1, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     stats_card.grid_columnconfigure(1, weight=1)
 

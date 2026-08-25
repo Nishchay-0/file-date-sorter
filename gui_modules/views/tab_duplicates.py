@@ -8,6 +8,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_duplicates_tab(gui_instance):
     gui_instance.dup_main_scroll = ctk.CTkScrollableFrame(gui_instance.tab_duplicates, fg_color="transparent")
@@ -15,7 +25,7 @@ def setup_duplicates_tab(gui_instance):
     main_container.pack(fill="both", expand=True)
     main_container.grid_columnconfigure(0, weight=1)
 
-    dup_control_card = ctk.CTkFrame(main_container, corner_radius=12)
+    dup_control_card = ctk.CTkFrame(main_container, corner_radius=16)
     dup_control_card.pack(fill="x", pady=(0, 6), ipadx=8, ipady=6)
     dup_control_card.grid_columnconfigure(1, weight=1)
 
@@ -35,7 +45,7 @@ def setup_duplicates_tab(gui_instance):
 
     ctk.CTkButton(dup_btn_box, text="📁 Pick Folder...", command=gui_instance.browse_dup_folder, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=95).pack(side="left", padx=(0, 3))
     ctk.CTkButton(dup_btn_box, text="📁+ Multi Folders...", command=lambda: gui_instance.browse_multiple_folders(gui_instance.dup_dir_var, gui_instance.run_find_duplicates), font=ctk.CTkFont(size=10, weight="bold"), fg_color="#1565c0", height=32, width=110).pack(side="left", padx=(0, 3))
-    ctk.CTkButton(dup_btn_box, text="📄 Pick Files...", command=gui_instance.browse_dup_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#00838f", height=32, width=90).pack(side="left")
+    ctk.CTkButton(dup_btn_box, text="📄 Pick Files...", command=gui_instance.browse_dup_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f", height=32, width=90).pack(side="left")
 
     # Dedicated Delete / Discard Folder Selection Row
     ctk.CTkLabel(dup_control_card, text="Delete Folder:", font=ctk.CTkFont(size=11, weight="bold"), text_color="#ef9a9a").grid(row=2, column=0, sticky="w", padx=(12, 8), pady=3)
@@ -61,7 +71,7 @@ def setup_duplicates_tab(gui_instance):
     dup_dest_btn_box = ctk.CTkFrame(dup_control_card, fg_color="transparent")
     dup_dest_btn_box.grid(row=3, column=2, sticky="e", padx=(0, 12), pady=3)
 
-    ctk.CTkButton(dup_dest_btn_box, text="📁 Select Custom Keep Folder...", command=gui_instance.browse_dup_dest_folder, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#f57c00", height=32, width=175).pack(side="left", padx=(0, 3))
+    ctk.CTkButton(dup_dest_btn_box, text="📁 Select Custom Keep Folder...", command=gui_instance.browse_dup_dest_folder, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#FF9500", "#FF9F0A") if HAS_THEME else "#f57c00", height=32, width=175).pack(side="left", padx=(0, 3))
     ctk.CTkButton(dup_dest_btn_box, text="🧹 Default", command=gui_instance.reset_dup_dest_folder, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=65, fg_color=("gray75", "gray30"), text_color=("gray10", "gray90")).pack(side="left")
     CTkToolTip(dup_dest_btn_box, "By default, kept files remain in their original location. Click 'Select Custom Keep Folder...' to move them elsewhere.")
 
@@ -125,7 +135,7 @@ def setup_duplicates_tab(gui_instance):
         text="☁️ OneDrive Mode",
         command=gui_instance.set_onedrive_dup_mode,
         font=ctk.CTkFont(size=10, weight="bold"),
-        fg_color="#0288d1",
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1",
         hover_color="#0277bd",
         height=24
     )
@@ -165,7 +175,7 @@ def setup_duplicates_tab(gui_instance):
     btn_univ_quick.pack(side="left", padx=(0, 4))
     CTkToolTip(btn_univ_quick, "Automatically selects ALL file categories (Images, Videos, Docs, PDFs, Audio, Code, Zip) and launches scan!")
 
-    ctk.CTkButton(sel_toolbar, text="☑ Select All Categories", command=gui_instance.dup_select_all_cats, font=ctk.CTkFont(size=10), height=22, width=145, fg_color="#0288d1").pack(side="left", padx=(0, 4))
+    ctk.CTkButton(sel_toolbar, text="☑ Select All Categories", command=gui_instance.dup_select_all_cats, font=ctk.CTkFont(size=10), height=22, width=145, fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1").pack(side="left", padx=(0, 4))
     ctk.CTkButton(sel_toolbar, text="☐ Clear All", command=gui_instance.dup_clear_all_cats, font=ctk.CTkFont(size=10), height=22, width=80, fg_color=("gray72", "gray32"), text_color=("gray10", "gray90")).pack(side="left", padx=(0, 4))
     ctk.CTkButton(sel_toolbar, text="⇄ Invert", command=gui_instance.dup_invert_cats, font=ctk.CTkFont(size=10), height=22, width=65, fg_color=("gray72", "gray32"), text_color=("gray10", "gray90")).pack(side="left")
 
@@ -205,7 +215,7 @@ def setup_duplicates_tab(gui_instance):
         ctk.CTkLabel(sub_lbl_row, text="Extensions:", font=ctk.CTkFont(size=9, weight="bold"), text_color="gray60").pack(side="left")
         ctk.CTkButton(sub_lbl_row, text="All", width=28, height=16, font=ctk.CTkFont(size=9),
             command=lambda lbl=type_label: gui_instance._dup_sub_select_all(lbl),
-            fg_color="#0288d1").pack(side="right", padx=1)
+            fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1").pack(side="right", padx=1)
         ctk.CTkButton(sub_lbl_row, text="None", width=34, height=16, font=ctk.CTkFont(size=9),
             command=lambda lbl=type_label: gui_instance._dup_sub_clear_all(lbl),
             fg_color=("gray75", "gray35"), text_color=("gray20", "gray80")).pack(side="right", padx=1)
@@ -260,7 +270,7 @@ def setup_duplicates_tab(gui_instance):
         text="🔍 Detect All Exts in Folder...",
         command=gui_instance.detect_all_exts_in_dup_folder,
         font=ctk.CTkFont(size=10, weight="bold"),
-        fg_color="#00838f",
+        fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f",
         hover_color="#006064",
         height=28
     ).pack(side="right")
@@ -279,7 +289,7 @@ def setup_duplicates_tab(gui_instance):
     chk_rec.pack(side="left", padx=(0, 10))
     CTkToolTip(chk_rec, "When checked, scans every level of nested subfolders deep down.")
 
-    toolbar_card = ctk.CTkFrame(main_container, corner_radius=10, fg_color=("gray90", "gray17"))
+    toolbar_card = ctk.CTkFrame(main_container, corner_radius=10, fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray17"))
     toolbar_card.pack(fill="x", pady=(0, 6), ipadx=8, ipady=4)
 
     btn_univ_main = ctk.CTkButton(
@@ -300,7 +310,7 @@ def setup_duplicates_tab(gui_instance):
         text="🔍 Scan Selected",
         command=gui_instance.run_find_duplicates,
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        fg_color="#0288d1",
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1",
         hover_color="#0277bd",
         height=30,
         width=125
@@ -311,7 +321,7 @@ def setup_duplicates_tab(gui_instance):
         text="🪟 Popup Resolver",
         command=gui_instance.open_dup_resolver_modal,
         font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-        fg_color="#7b1fa2",
+        fg_color=("#AF52DE", "#BF5AF2") if HAS_THEME else "#7b1fa2",
         hover_color="#6a1b9a",
         height=30,
         width=135
@@ -321,7 +331,7 @@ def setup_duplicates_tab(gui_instance):
 
     ctk.CTkButton(toolbar_card, text="🛡️ Keep Oldest", command=gui_instance.auto_select_keep_oldest, font=ctk.CTkFont(size=10, weight="bold"), height=28, fg_color="#2e7d32").pack(side="left", padx=2)
     ctk.CTkButton(toolbar_card, text="⚡ Keep Newest", command=gui_instance.auto_select_keep_newest, font=ctk.CTkFont(size=10, weight="bold"), height=28, fg_color="#6a1b9a").pack(side="left", padx=2)
-    ctk.CTkButton(toolbar_card, text="🖼️ Highest Res", command=gui_instance.auto_select_keep_highest_res, font=ctk.CTkFont(size=10, weight="bold"), height=28, fg_color="#00838f").pack(side="left", padx=2)
+    ctk.CTkButton(toolbar_card, text="🖼️ Highest Res", command=gui_instance.auto_select_keep_highest_res, font=ctk.CTkFont(size=10, weight="bold"), height=28, fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f").pack(side="left", padx=2)
     ctk.CTkButton(toolbar_card, text="📁 Shortest Path", command=gui_instance.auto_select_keep_shortest_path, font=ctk.CTkFont(size=10, weight="bold"), height=28, fg_color="#e65100").pack(side="left", padx=2)
     ctk.CTkButton(toolbar_card, text="📌 Select All", command=gui_instance.auto_select_all_duplicates, font=ctk.CTkFont(size=10), height=28, fg_color=("gray75", "gray30"), text_color=("gray10", "gray90")).pack(side="left", padx=2)
     ctk.CTkButton(toolbar_card, text="🧹 Clear", command=gui_instance.clear_dup_selection, font=ctk.CTkFont(size=10), height=28, fg_color=("gray75", "gray30"), text_color=("gray10", "gray90")).pack(side="left", padx=2)
@@ -356,7 +366,7 @@ def setup_duplicates_tab(gui_instance):
 
     gui_instance.dup_progress_bar = ctk.CTkProgressBar(
         gui_instance.dup_progress_frame,
-        progress_color="#0288d1",
+        progress_color=("#007AFF", "#0A84FF"),
         height=12,
         corner_radius=6
     )
@@ -373,7 +383,7 @@ def setup_duplicates_tab(gui_instance):
     gui_instance.dup_progress_detail_lbl.pack(fill="x", padx=10, pady=(0, 4))
 
     # Live Duplicate Breakdown & Space Savings Preview Card (Matching File Organiser Layout!)
-    gui_instance.dup_summary_card = ctk.CTkFrame(main_container, corner_radius=12, fg_color=("gray90", "gray17"))
+    gui_instance.dup_summary_card = ctk.CTkFrame(main_container, corner_radius=16, fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray17"))
     gui_instance.dup_summary_card.pack(fill="x", pady=(0, 6), ipadx=8, ipady=6)
 
     sum_hdr = ctk.CTkFrame(gui_instance.dup_summary_card, fg_color="transparent")
@@ -408,7 +418,7 @@ def setup_duplicates_tab(gui_instance):
     search_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
     # Action Card (Clean toolbar above cards view)
-    act_card = ctk.CTkFrame(main_container, corner_radius=12, fg_color=("gray85", "gray20"))
+    act_card = ctk.CTkFrame(main_container, corner_radius=16, fg_color=("gray85", "gray20"))
     act_card.pack(fill="x", pady=(0, 6), ipadx=8, ipady=4)
 
     gui_instance.dup_action_lbl = ctk.CTkLabel(act_card, text="Selected: 0 files (0 B ready for cleanup)", font=ctk.CTkFont(size=12, weight="bold"))
@@ -418,8 +428,8 @@ def setup_duplicates_tab(gui_instance):
     act_btns.pack(side="right", padx=8)
 
     ctk.CTkButton(act_btns, text="🗑️ Delete Selected", command=gui_instance.delete_selected_duplicates, font=ctk.CTkFont(size=11, weight="bold"), height=32, fg_color="#c62828").pack(side="left", padx=3)
-    ctk.CTkButton(act_btns, text="📁 Move Selected to Folder...", command=gui_instance.move_selected_duplicates, font=ctk.CTkFont(size=11, weight="bold"), height=32, fg_color="#f57c00").pack(side="left", padx=3)
-    ctk.CTkButton(act_btns, text="📦 Move ALL (Originals + Dups)...", command=gui_instance.move_all_group_files_to_folder, font=ctk.CTkFont(size=11, weight="bold"), height=32, fg_color="#7b1fa2").pack(side="left", padx=3)
+    ctk.CTkButton(act_btns, text="📁 Move Selected to Folder...", command=gui_instance.move_selected_duplicates, font=ctk.CTkFont(size=11, weight="bold"), height=32, fg_color=("#FF9500", "#FF9F0A") if HAS_THEME else "#f57c00").pack(side="left", padx=3)
+    ctk.CTkButton(act_btns, text="📦 Move ALL (Originals + Dups)...", command=gui_instance.move_all_group_files_to_folder, font=ctk.CTkFont(size=11, weight="bold"), height=32, fg_color=("#AF52DE", "#BF5AF2") if HAS_THEME else "#7b1fa2").pack(side="left", padx=3)
     ctk.CTkButton(act_btns, text="🔗 Hard Link Duplicates", command=gui_instance.link_selected_duplicates, font=ctk.CTkFont(size=11, weight="bold"), height=32, fg_color="#43a047").pack(side="left", padx=3)
     ctk.CTkButton(act_btns, text="📊 Export Report...", command=gui_instance.export_dup_report, font=ctk.CTkFont(size=11, weight="bold"), height=32, fg_color="#1565c0").pack(side="left", padx=3)
 
@@ -434,7 +444,7 @@ def setup_duplicates_tab(gui_instance):
     gui_instance.placeholder_lbl.pack(pady=30)
 
     # Real-Time Activity Log Console (Identical to File Organiser page!)
-    gui_instance.dup_log_card = ctk.CTkFrame(main_container, corner_radius=12)
+    gui_instance.dup_log_card = ctk.CTkFrame(main_container, corner_radius=16)
     gui_instance.dup_log_card.pack(fill="x", pady=(6, 8), ipadx=8, ipady=6)
 
     dup_log_hdr = ctk.CTkFrame(gui_instance.dup_log_card, fg_color="transparent")

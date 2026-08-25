@@ -8,6 +8,16 @@ try:
 except ImportError:
     HAS_CUSTOMTKINTER = False
 
+try:
+    from gui_modules.theme_manager import (
+        GLASS, FONTS, glass_frame, glass_frame_alt, accent_button,
+        secondary_button, section_label, status_badge,
+        styled_entry, styled_progress, resolve_accent, animate_hover
+    )
+    HAS_THEME = True
+except ImportError:
+    HAS_THEME = False
+
 
 def setup_cleaner_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_cleaner, fg_color="transparent")
@@ -15,7 +25,7 @@ def setup_cleaner_tab(gui_instance):
     scroll.grid_columnconfigure(0, weight=1)
     gui_instance.cleaner_scroll = scroll
 
-    cln_hdr_card = ctk.CTkFrame(scroll, corner_radius=12)
+    cln_hdr_card = ctk.CTkFrame(scroll, corner_radius=16)
     cln_hdr_card.grid(row=0, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=8)
     cln_hdr_card.grid_columnconfigure(1, weight=1)
 
@@ -35,14 +45,14 @@ def setup_cleaner_tab(gui_instance):
 
     ctk.CTkButton(cln_btn_box, text="📁 Pick Folder...", command=gui_instance.browse_cln_folder, font=ctk.CTkFont(size=10, weight="bold"), height=32, width=95).pack(side="left", padx=(0, 3))
     ctk.CTkButton(cln_btn_box, text="📁+ Multi Folders...", command=lambda: gui_instance.browse_multiple_folders(gui_instance.cln_dir_var, gui_instance.run_cleaner_scan), font=ctk.CTkFont(size=10, weight="bold"), fg_color="#1565c0", height=32, width=110).pack(side="left", padx=(0, 3))
-    ctk.CTkButton(cln_btn_box, text="📄 Pick Files...", command=gui_instance.browse_cln_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color="#00838f", height=32, width=90).pack(side="left", padx=(0, 3))
+    ctk.CTkButton(cln_btn_box, text="📄 Pick Files...", command=gui_instance.browse_cln_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f", height=32, width=90).pack(side="left", padx=(0, 3))
 
     ctk.CTkButton(
         cln_btn_box,
         text="🔍 Scan Storage",
         command=gui_instance.run_cleaner_scan,
         font=ctk.CTkFont(size=11, weight="bold"),
-        fg_color="#0288d1",
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1",
         height=32,
         width=120
     ).pack(side="left")
@@ -76,7 +86,7 @@ def setup_cleaner_tab(gui_instance):
     ctk.CTkButton(
         junk_toolbar, text="☑ All", command=gui_instance.junk_select_all,
         font=ctk.CTkFont(size=10, weight="bold"), height=24, width=55,
-        fg_color="#0288d1", hover_color="#0277bd"
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1", hover_color="#0277bd"
     ).pack(side="left", padx=2, pady=5)
 
     ctk.CTkButton(
@@ -97,7 +107,7 @@ def setup_cleaner_tab(gui_instance):
     ctk.CTkButton(
         junk_toolbar, text="🗂️ .tmp/.log", command=lambda: gui_instance.junk_select_by_reason("Temp"),
         font=ctk.CTkFont(size=10), height=24, width=80,
-        fg_color="#f57c00", hover_color="#ef6c00"
+        fg_color=("#FF9500", "#FF9F0A") if HAS_THEME else "#f57c00", hover_color="#ef6c00"
     ).pack(side="left", padx=2, pady=5)
 
     ctk.CTkButton(
@@ -155,7 +165,7 @@ def setup_cleaner_tab(gui_instance):
     ctk.CTkButton(
         empty_toolbar, text="☑ All", command=gui_instance.empty_select_all,
         font=ctk.CTkFont(size=10, weight="bold"), height=24, width=55,
-        fg_color="#0288d1", hover_color="#0277bd"
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1", hover_color="#0277bd"
     ).pack(side="left", padx=2, pady=5)
 
     ctk.CTkButton(
@@ -185,13 +195,13 @@ def setup_cleaner_tab(gui_instance):
     ctk.CTkButton(
         empty_toolbar, text="🔍 Scan Empty Folders", command=gui_instance.run_empty_folder_scan,
         font=ctk.CTkFont(size=10, weight="bold"), height=24, width=135,
-        fg_color="#0288d1", hover_color="#0277bd"
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1", hover_color="#0277bd"
     ).pack(side="left", padx=3, pady=5)
 
     ctk.CTkButton(
         empty_toolbar, text="🗑️ Delete Selected", command=gui_instance.delete_selected_empty_folders,
         font=ctk.CTkFont(size=10, weight="bold"), height=24, width=115,
-        fg_color="#d32f2f", hover_color="#b71c1c"
+        fg_color=("#FF3B30", "#FF453A") if HAS_THEME else "#d32f2f", hover_color="#b71c1c"
     ).pack(side="left", padx=2, pady=5)
 
     ctk.CTkButton(
@@ -241,7 +251,7 @@ def setup_cleaner_tab(gui_instance):
     ctk.CTkButton(
         large_toolbar, text="☑ All", command=gui_instance.large_select_all,
         font=ctk.CTkFont(size=10, weight="bold"), height=24, width=55,
-        fg_color="#0288d1", hover_color="#0277bd"
+        fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1", hover_color="#0277bd"
     ).pack(side="left", padx=2, pady=5)
 
     ctk.CTkButton(
@@ -341,6 +351,6 @@ def setup_cleaner_tab(gui_instance):
         text="📁 Move Selected Large Files to Folder...",
         command=gui_instance.move_selected_large_files,
         font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-        fg_color="#f57c00",
+        fg_color=("#FF9500", "#FF9F0A") if HAS_THEME else "#f57c00",
         height=36
     ).pack(side="left")
