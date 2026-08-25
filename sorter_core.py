@@ -495,7 +495,7 @@ def strip_all_extensions(filename_or_basename):
     name = os.path.basename(filename_or_basename)
     while True:
         base, ext = os.path.splitext(name)
-        if ext and len(ext) > 1 and ' ' not in ext:
+        if ext and re.match(r'^\.[a-zA-Z0-9]{1,7}$', ext):
             name = base
         else:
             break
@@ -521,109 +521,100 @@ def natural_sort_key(text):
 def extract_meaningful_group(filename):
     """
     Extracts the meaningful title / multi-word group from a filename:
-    - Strips extension and leading/trailing underscores/hyphens/spaces.
-    - Filters out machine hashes, pure numbers, UUIDs, Meta CDN IDs, and interleaved gibberish.
-    - Removes common leading stopwords ('the', 'a', 'an', 'my', 'your', etc.) to prevent false collisions.
-    - Preserves multi-word title prefixes before the first digit or date pattern.
-    - If filename starts with a leading numeric prefix (e.g. '2024_report.pdf'), strips leading digits to extract the topic word.
-    - Returns clean underscore-joined title group (e.g. 'june_pearl', 'silent_eyes', 'document', 'guru_finance_report'),
-      or None if no meaningful alphabetic words exist.
-
-    Examples:
-      '_the_june_pearl_-12102022-0001.mp4' -> 'june_pearl'
-      'the_silent_eyes_145-07062022-0001.mp4' -> 'silent_eyes'
-      'my_document_2024.pdf' -> 'document'
-      'a_nice_photo.jpg' -> 'nice_photo'
-      'guru_finance_report.xls' -> 'guru_finance_report'
-      '2024_report.pdf' -> 'report'
-      '336101256_21499.jpg' -> None
-      'hfqgifcbkj9.png' -> None
-      '323f9w8ehf8awjefi.docx' -> None
+    - Strips extension and normalizes separators (_, -, ., and spaces) into single _.
+    - Scans tokens in order, collecting alphabetic sequences and preserving useful prefixes (e.g. 'pvt', 'm', 'ser').
+    - Skips leading numeric index counters (e.g. '001', '13') before words.
+    - Stops scanning when encountering numeric date stamps / IDs after title words.
+    - Strips leading common stopwords ('the', 'a', 'an', 'my', 'your', etc.).
+    - Validates minimum length rule (>= 3 chars, at least one token >= 2 chars).
+    - Returns clean underscore-joined group (e.g. 'june_pearl', 'pvt_shaunak', 'pvt_m', 'akshya_lather', 'document'),
+      or None if the file is purely random / hash / unidentifiable.
     """
     if not filename:
         return None
 
-    stem = strip_all_extensions(filename).strip()
-    stem = stem.strip(' _-.')
+    base = os.path.basename(filename)
+    stem = strip_all_extensions(base).strip()
     if not stem:
         return None
 
-    # UUID Check
-    if UUID_REGEX.match(stem):
+    # Check UUID or pure numeric without separator
+    clean_no_sep = re.sub(r'[\s_\-\.]', '', stem)
+    if clean_no_sep.isdigit() or UUID_REGEX.match(stem):
         return None
 
-    # Pure numeric strings (e.g. 336101256, 123456789)
-    if stem.isdigit():
-        return None
-
-    # Separator-only or punctuation-only artifacts
-    if re.match(r'^[\s_\-\.]+$', stem):
-        return None
-
-    # Hexadecimal hash >= 12 chars (e.g. MD5, SHA1, SHA256)
-    if HEX_HASH_REGEX.match(stem) and any(c.isdigit() for c in stem) and any(c.isalpha() for c in stem):
-        return None
-
-    # Meta / Facebook / Instagram CDN ID pattern
-    if META_CDN_REGEX.match(stem):
-        return None
-
-    # Interleaved hash/random alphanumeric strings (e.g. 323f9w8ehf8awjefi, 4f8a2c9e1b)
-    if re.search(r'\d+[a-zA-Z]\d+|\d+[a-zA-Z]{1,2}\d+', stem):
-        return None
-
-    # Multi-digit numeric ID sequences with separators (10+ digits with no word letters)
-    clean_no_sep = re.sub(r'[_\-\.\s]', '', stem)
-    if clean_no_sep.isdigit() and len(clean_no_sep) >= 10:
-        return None
-
-    # If stem starts with a leading numeric prefix like '2024_' or '01-', strip it for semantic fallback
-    work_stem = stem
-    if re.match(r'^\d+[\s_\-]+', work_stem):
-        work_stem = re.sub(r'^\d+[\s_\-]+', '', work_stem).strip(' _-.')
-
-    # Extract alphabetical/underscore prefix before the first digit or date pattern
-    m = re.match(r'^([a-zA-Z\s_\-]+?)(?=[0-9]|$)', work_stem)
-    if not m:
-        return None
-
-    prefix = m.group(1).strip(' _-.')
-    if not prefix:
-        return None
-
-    # Tokenize prefix into alphabetical words
-    raw_tokens = re.findall(r'[a-zA-Z]+', prefix)
-    if not raw_tokens:
-        return None
-
-    # If first token is a common stopword, remove it and use remaining tokens
-    if raw_tokens[0].lower() in COMMON_STOPWORDS:
-        if len(raw_tokens) > 1:
-            raw_tokens = raw_tokens[1:]
-        else:
+    # Hexadecimal hash >= 12 chars without clear alphabetic token >= 3 chars
+    if HEX_HASH_REGEX.match(clean_no_sep) and any(c.isdigit() for c in clean_no_sep) and any(c.isalpha() for c in clean_no_sep):
+        tokens_all = re.findall(r'[a-zA-Z]+', stem)
+        if not any(len(t) >= 3 for t in tokens_all):
             return None
 
-    # Filter valid tokens (must contain vowel, not consonant cluster, >= 2 chars)
-    valid_tokens = []
-    for tok in raw_tokens:
-        t = tok.lower()
-        vowels = sum(1 for c in t if c in 'aeiou')
-        if vowels == 0:
-            continue
-        # Exclude consonant clusters (4+ consecutive consonants)
-        if CONSONANT_CLUSTER_REGEX.search(t):
-            continue
-        # Minimum vowel ratio (at least 20% vowels)
-        if (vowels / len(t)) < 0.20:
-            continue
-        if len(t) < 2:
-            continue
-        valid_tokens.append(t)
-
-    if not valid_tokens:
+    # Interleaved hash/random alphanumeric strings (e.g. 323f9w8ehf8awjefi, 4f8a2c9e1b)
+    if re.search(r'\d+[a-zA-Z]+\d+[a-zA-Z]+|\d+[a-zA-Z]\d+', stem):
         return None
 
-    return '_'.join(valid_tokens)
+    # Random consonant gibberish without vowels and long (>8 chars) like hfqgifcbkj9
+    alpha_only = re.sub(r'[^a-zA-Z]', '', stem)
+    if len(alpha_only) >= 8 and not any(v in alpha_only.lower() for v in 'aeiou'):
+        return None
+    if len(alpha_only) >= 9 and (sum(1 for c in alpha_only.lower() if c in 'aeiou') / len(alpha_only)) <= 0.15:
+        return None
+
+    # Normalize separators: replace _, -, ., and spaces with a single _
+    norm = re.sub(r'[\s_\-\.]+', '_', stem).strip('_')
+    if not norm:
+        return None
+
+    tokens = norm.split('_')
+    prefix_parts = []
+    started = False
+
+    for tok in tokens:
+        if not tok:
+            continue
+
+        # Pure numeric token (e.g., 001, 14030928, 20260316)
+        if tok.isdigit():
+            if started:
+                # STOP scanning; break the loop
+                break
+            else:
+                # Leading counter / index before words (e.g. _001_rahul, 13_deshwal)
+                continue
+
+        # Token contains both digits and letters (e.g., 100ser, 0927p)
+        alpha_parts = re.findall(r'[a-zA-Z]+', tok)
+        if not alpha_parts:
+            if started:
+                break
+            else:
+                continue
+
+        for ap in alpha_parts:
+            prefix_parts.append(ap.lower())
+            started = True
+
+    if not prefix_parts:
+        return None
+
+    # Post-scan processing: remove leading common stopwords
+    while prefix_parts and prefix_parts[0] in COMMON_STOPWORDS:
+        prefix_parts.pop(0)
+
+    if not prefix_parts:
+        return None
+
+    # Validation:
+    # 1. Total joined length >= 3
+    joined = '_'.join(prefix_parts)
+    if len(joined) < 3:
+        return None
+
+    # 2. At least one token of length >= 2
+    if not any(len(p) >= 2 for p in prefix_parts):
+        return None
+
+    return joined
 
 
 # Backward compatibility alias

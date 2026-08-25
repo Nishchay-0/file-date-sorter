@@ -14,6 +14,7 @@
 | 2026-08-25 | **Word-Based Sorting & Single Random Catch-All** | Implemented `extract_word_base()` extracting first meaningful alphabetical word (3+ letters, >= 1 vowel) per filename and routing to unique word folders (`amazon/`, `guru/`). All non-word / hash / gibberish files route to ONE shared `_Random/` folder. Added pre-execution plan modal, ISO date prefix renaming, and Unsorted subdivision options. 47/47 pytest + 12/12 deployment tests passing (100%). |
 | 2026-08-25 | **Native Smooth Scrolling Engine** | Removed monkey-patched scrolling engine and individual widget bindings in `gui_modules/app.py`. Enabled native CustomTkinter `CTkScrollableFrame` mouse wheel handling across all tool tabs and modal dialogs, eliminating hover focus hijacking. |
 | 2026-08-25 | **Stopword-Aware Multi-Word Title Sorting** | Implemented `extract_meaningful_group()` in `sorter_core.py`. Strips leading stopwords (`the`, `a`, `my`, etc.) and preserves multi-word title prefixes before numeric/date patterns (e.g. `_the_june_pearl_...` -> `june_pearl/`, `the_silent_eyes_...` -> `silent_eyes/`). All non-word/hash files consolidated into single `_Random/` folder. 47/47 pytest + 12/12 deployment tests passing (100%). |
+| 2026-08-25 | **Deterministic Prefix-Preserving Grouping Engine** | Overhauled `sorter_core.py` with deterministic token scanning that preserves useful prefixes (`pvt`, `m`, `ser`), skips leading index counters, stops on numeric date stamps, and unifies all random/hash files into a single `_Random/` folder. 14/14 super prompt scenarios + 12/12 deployment tests passing (100%). |
 
 ---
 
@@ -47,14 +48,15 @@
 | Word-based folder grouping | Groups by first meaningful alphabetical word and consolidates all non-word files into one `_Random/` folder | ✅ LOCKED |
 | Native CTkScrollableFrame scrolling | Clean native wheel handling without monkey-patches or hover event blocking | ✅ LOCKED |
 | Stopword-aware multi-word title grouping | Strips leading stopwords ('the', 'a', etc.) and takes title prefix before digits to avoid grouping everything under 'the' | ✅ LOCKED |
+| Deterministic prefix preservation | Preserves 'pvt', 'm', 'ser' and handles multi-part names while dropping leading counter numbers | ✅ LOCKED |
 
 ---
 
 ## 📋 Session Handoff Notes (2026-08-25)
 
 **What changed:**
-- Implemented `extract_meaningful_group()` in `sorter_core.py` with leading stopword elimination and multi-word title preservation before digits/dates.
-- Handled all prompt cases (`_the_june_pearl_...` -> `june_pearl`, `the_silent_eyes_...` -> `silent_eyes`, `my_document_2024` -> `document`, etc.).
-- Machine hashes (`336101256_...`, `hfqgifcbkj9`, `323f9w8ehf8awjefi`) route to ONE single `_Random/` folder.
-- Verified test suites: **47 passed in pytest (100%)** and **12/12 deployment tests passed (100%)**.
+- Overhauled `extract_meaningful_group()` in `sorter_core.py` with deterministic token scanning and separator normalization.
+- Verified 14 target patterns (e.g. `_pvt.shaunak_...` -> `pvt_shaunak`, `13_deshwal-...` -> `deshwal`, `vanujawaliya.-...` -> `vanujawaliya`, `100ser_...` -> `ser`).
+- Fixed compound extension handling in `strip_all_extensions()`.
+- Validated all tests: **14/14 in test_sorter.py**, **8/8 in test_smart_name_sorter.py**, **12/12 in test_deployment.py (100%)**, and **47/47 in pytest (100%)**.
 
