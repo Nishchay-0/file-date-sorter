@@ -4996,7 +4996,7 @@ if HAS_CUSTOMTKINTER:
                             item['filename'],
                             item['rel_src'],
                             item['rel_target'],
-                            item['category'],
+                            item.get('classification_label', item['category']) if sort_category == "smart_name" else item['category'],
                             item['size_str'],
                             item.get("status_str", "Ready to Move")
                         ) for item in preview_items]
