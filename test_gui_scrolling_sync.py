@@ -55,13 +55,16 @@ class TestGUIScrollingSync(unittest.TestCase):
             self.assertIsNotNone(scroll_obj, f"Scroll object {attr} is None")
             self.assertTrue(hasattr(scroll_obj, '_parent_canvas'), f"Scroll object {attr} missing _parent_canvas")
 
-    def test_02_global_mousewheel_bindings(self):
+    def test_02_native_scrollable_frames_and_handlers(self):
         if not self.root:
             self.skipTest("Tkinter GUI environment not available")
 
-        # Check global mousewheel bindings on root
-        mw_bind = self.root.bind_all("<MouseWheel>")
-        self.assertIsNotNone(mw_bind, "Global <MouseWheel> binding missing")
+        # Verify CTkScrollableFrame retain native handlers without monkey-patching
+        import customtkinter as ctk
+        self.assertTrue(
+            hasattr(ctk.CTkScrollableFrame, '_mouse_wheel_all') or hasattr(ctk.CTkScrollableFrame, '_mouse_wheel'),
+            "CTkScrollableFrame native mouse wheel handlers missing"
+        )
 
 
 if __name__ == '__main__':

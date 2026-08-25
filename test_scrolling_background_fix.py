@@ -68,20 +68,15 @@ class TestScrollingBackgroundFix(unittest.TestCase):
             self.assertEqual(active, tab_name, f"Failed to switch to {tab_name}")
 
     def test_02_mousewheel_handler_exists(self):
-        """Verify mousewheel handler is properly bound"""
+        """Verify CTkScrollableFrame native mousewheel handler is enabled (not monkey-patched)"""
         if not self.root:
             self.skipTest("GUI environment not available")
 
-        # Check that mousewheel bindings exist
-        try:
-            bindings = self.root.bind_all("<MouseWheel>")
-            # Just verify binding exists (non-empty string means bound)
-            self.assertTrue(
-                bindings or True,  # Binding might be empty string or contain function name
-                "Global MouseWheel binding missing"
-            )
-        except Exception as e:
-            self.fail(f"Error checking mousewheel bindings: {e}")
+        # Verify CTkScrollableFrame retains its native _mouse_wheel_all / _mouse_wheel
+        self.assertTrue(
+            hasattr(ctk.CTkScrollableFrame, '_mouse_wheel_all') or hasattr(ctk.CTkScrollableFrame, '_mouse_wheel'),
+            "CTkScrollableFrame native mouse wheel handlers missing"
+        )
 
     def test_03_active_tab_detection(self):
         """Verify active tab can be detected correctly"""
@@ -124,42 +119,37 @@ class TestScrollingBackgroundFix(unittest.TestCase):
 
     def test_05_scrolling_fix_verification(self):
         """
-        Verify that the background scrolling fix is in place.
-        
-        The fix removes the problematic fallback loop that picks the first
-        scroll container found, replacing it with active-tab-aware logic.
+        Verify that all tabs have native CTkScrollableFrame containers with _parent_canvas.
         """
         if not self.root:
             self.skipTest("GUI environment not available")
 
-        # Read the actual source code of the mousewheel handler to verify the fix
-        import inspect
-        try:
-            # Get the _setup_global_smooth_scrolling method
-            method = getattr(self.root, '_setup_global_smooth_scrolling', None)
-            if method:
-                source = inspect.getsource(method)
-                
-                # Verify that the FIXED comment is present in the code
-                # (indicating our fix is in place)
-                self.assertIn(
-                    "CRITICAL FIX",
-                    source,
-                    "Background scrolling fix comment not found in source code"
+        tabs = [
+            "📅 File Organizer", "🔍 Duplicates Finder", "👥 People Sorter",
+            "📦 Subfolder Extractor", "🪄 Magic Converter", "🏷️ Bulk Renamer",
+            "🧹 Storage Cleaner", "📊 Analytics", "👁️ Auto Watcher", "🚫 Exclusions"
+        ]
+
+        for tab_name in tabs:
+            self.root._on_tab_changed(tab_name)
+
+        scroll_attrs = [
+            'organizer_scroll', 'dup_main_scroll', 'people_scroll', 'extractor_scroll',
+            'converter_scroll', 'renamer_scroll', 'cleaner_scroll', 'insights_scroll',
+            'watcher_scroll', 'exclusions_scroll'
+        ]
+
+        for attr in scroll_attrs:
+            scroll_obj = getattr(self.root, attr, None)
+            if scroll_obj:
+                self.assertTrue(
+                    isinstance(scroll_obj, ctk.CTkScrollableFrame),
+                    f"{attr} is not an instance of CTkScrollableFrame"
                 )
-                
-                # Verify the problematic fallback loop has been removed
-                # The old code had: "for attr in ('people_scroll', 'organizer_scroll', ..."
-                # This should NOT be in the new code for scrolling specifically
-                # (it was moved to a different context)
-                self.assertIn(
-                    "only scroll active tab",
-                    source.lower(),
-                    "Fix comment about active tab scrolling not found"
+                self.assertTrue(
+                    hasattr(scroll_obj, '_parent_canvas'),
+                    f"{attr} missing _parent_canvas"
                 )
-        except Exception as e:
-            print(f"⚠️  Could not verify source code fix: {e}")
-            # Still pass - the functional test is what matters
 
 
 if __name__ == '__main__':

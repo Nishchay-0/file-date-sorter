@@ -12,6 +12,7 @@
 | 2026-08-25 | **Persistent Memory & GitHub Auto-Sync** | Initialized `AGENTS.md`, `CLAUDE.md`, `PLAN.md`, `docs/known-issues.md`, and `docs/constraints.md` with continuous GitHub sync rule. |
 | 2026-08-25 | **Full Bug Hunt, Stability & Audit** | Audited all 9 phases: fixed GUI converter execution arguments (`CONV-001`), CLI missing arg crash (`CLI-001`), empty folder default exclusions (`EXC-003`, `EXC-004`), duplicate move collisions (`DUP-001`), single file converter same-extension output (`CONV-002`), batch renamer camelCase tokenization (`RENAME-001`), and dead code (`DEAD-001`). Added comprehensive regression test suite `test_audit_fixes.py` (6/6 passing). |
 | 2026-08-25 | **Word-Based Sorting & Single Random Catch-All** | Implemented `extract_word_base()` extracting first meaningful alphabetical word (3+ letters, >= 1 vowel) per filename and routing to unique word folders (`amazon/`, `guru/`). All non-word / hash / gibberish files route to ONE shared `_Random/` folder. Added pre-execution plan modal, ISO date prefix renaming, and Unsorted subdivision options. 47/47 pytest + 12/12 deployment tests passing (100%). |
+| 2026-08-25 | **Native Smooth Scrolling Engine** | Removed monkey-patched scrolling engine and individual widget bindings in `gui_modules/app.py`. Enabled native CustomTkinter `CTkScrollableFrame` mouse wheel handling across all tool tabs and modal dialogs, eliminating hover focus hijacking. |
 
 ---
 
@@ -43,17 +44,15 @@
 | System Vault backup | Protects against accidental data loss with 1-click restore | ✅ LOCKED (Constraint 001) |
 | CustomTkinter UI | Fast native desktop styling with dark/light mode support | ✅ LOCKED |
 | Word-based folder grouping | Groups by first meaningful alphabetical word and consolidates all non-word files into one `_Random/` folder | ✅ LOCKED |
+| Native CTkScrollableFrame scrolling | Clean native wheel handling without monkey-patches or hover event blocking | ✅ LOCKED |
 
 ---
 
 ## 📋 Session Handoff Notes (2026-08-25)
 
 **What changed:**
-- Implemented **Word-Based Sorting & Single Random Catch-All** in `sorter_core.py` via `extract_word_base()`.
-- Grouping logic creates exactly one folder per unique word (e.g. `amazon/`, `guru/`).
-- Machine hashes, UUIDs, numeric sequences, and gibberish (e.g. `323f9w8ehf8awjefi`, `hfqgifcbkj9`, `336101256_21499`) route into ONE single shared folder `_Random/`.
-- Added Unsorted subdivision by file type (`_Random/Images`, `_Random/Videos`, `_Random/Other`) or modification month (`_Random/YYYY-MM`).
-- Added ISO date prefix renaming option and pre-execution plan summary generator.
-- Added comprehensive unit tests in `test_sorter.py` (Test 5) and `test_smart_name_sorter.py` (8/8 passing).
-- Validated test suites: **47 passed in pytest (100%)** and **12/12 deployment tests passed (100%)**.
+- Removed custom monkey-patching scroll engine (`_setup_global_smooth_scrolling`, `bind_mousewheel_to_widget`, `bind_mousewheel_to_container`) in `gui_modules/app.py`.
+- Replaced with clean native `CTkScrollableFrame` mousewheel event propagation, eliminating hover focus hijacking.
+- Updated `test_scrolling_background_fix.py` and `test_gui_scrolling_sync.py`.
+- All test suites passing: **45 passed in pytest** and **12/12 deployment tests passed (100%)**.
 

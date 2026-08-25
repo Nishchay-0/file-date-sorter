@@ -236,227 +236,6 @@ if HAS_CUSTOMTKINTER:
             }
 
             self.setup_ui()
-            self._setup_global_smooth_scrolling()
-
-        def bind_mousewheel_to_widget(self, target_widget):
-            """Binds universal mousewheel scrolling handler to a specific widget or window."""
-            if not target_widget:
-                return
-
-            def _on_widget_scroll(event):
-                scroll_units = 0
-                if getattr(event, 'num', None) == 4:
-                    scroll_units = -3
-                elif getattr(event, 'num', None) == 5:
-                    scroll_units = 3
-                elif getattr(event, 'delta', None):
-                    d = event.delta
-                    if abs(d) >= 120:
-                        scroll_units = int(-1 * (d / 120) * 3)
-                    else:
-                        scroll_units = -2 if d > 0 else (2 if d < 0 else 0)
-
-                if scroll_units == 0:
-                    return
-
-                target = None
-                curr = getattr(event, 'widget', None) or target_widget
-                while curr:
-                    if hasattr(curr, '_parent_canvas') and curr._parent_canvas:
-                        target = curr._parent_canvas
-                        break
-                    elif hasattr(curr, '_canvas') and curr._canvas:
-                        target = curr._canvas
-                        break
-                    elif isinstance(curr, (tk.Canvas, ttk.Treeview, tk.Text)):
-                        target = curr
-                        break
-                    try:
-                        curr = getattr(curr, 'master', None)
-                    except Exception:
-                        curr = None
-
-                if not target:
-                    try:
-                        x, y = target_widget.winfo_pointerxy()
-                        under_mouse = target_widget.winfo_containing(x, y)
-                        curr = under_mouse
-                        while curr:
-                            if hasattr(curr, '_parent_canvas') and curr._parent_canvas:
-                                target = curr._parent_canvas
-                                break
-                            elif hasattr(curr, '_canvas') and curr._canvas:
-                                target = curr._canvas
-                                break
-                            elif isinstance(curr, (tk.Canvas, ttk.Treeview, tk.Text)):
-                                target = curr
-                                break
-                            try:
-                                curr = getattr(curr, 'master', None)
-                            except Exception:
-                                curr = None
-                    except Exception:
-                        pass
-
-                if target:
-                    try:
-                        if hasattr(target, 'winfo_exists') and not target.winfo_exists():
-                            target = None
-                        else:
-                            target.yview_scroll(scroll_units, "units")
-                            return "break"
-                    except Exception:
-                        pass
-
-            try:
-                target_widget.bind("<MouseWheel>", _on_widget_scroll, add="+")
-                target_widget.bind("<Button-4>", _on_widget_scroll, add="+")
-                target_widget.bind("<Button-5>", _on_widget_scroll, add="+")
-            except Exception:
-                pass
-
-        def _setup_global_smooth_scrolling(self):
-            """
-            Fast universal mousewheel scrolling engine.
-            - Monkey-patches CTkScrollableFrame._mouse_wheel_all to a no-op so the
-              built-in slow (delta/6) handler is disabled completely.
-            - Our engine uses smooth 3-unit steps per notch for Windows & Linux UI consistency.
-            - Works anywhere in the window: cards, buttons, labels, images, margins.
-            """
-            import sys as _sys
-
-            # ── Disable CTkScrollableFrame's slow built-in handler once at startup ──
-            try:
-                ctk.CTkScrollableFrame._mouse_wheel_all = lambda self_sf, event: None
-            except Exception:
-                pass
-
-            def _on_global_mousewheel(event):
-                # Skip if Ctrl is held (that's for zoom, handled separately per-window)
-                state = getattr(event, 'state', 0)
-                ctrl_held = bool(state & 0x0004)
-                if ctrl_held:
-                    return
-
-                scroll_units = 0
-                if getattr(event, 'num', None) == 4:
-                    scroll_units = -3
-                elif getattr(event, 'num', None) == 5:
-                    scroll_units = 3
-                elif getattr(event, 'delta', 0):
-                    d = event.delta
-                    if abs(d) >= 120:
-                        scroll_units = int(-1 * (d / 120) * 3)
-                    else:
-                        scroll_units = -2 if d > 0 else (2 if d < 0 else 0)
-
-                if scroll_units == 0:
-                    return
-
-                widget = getattr(event, 'widget', None)
-                target = None
-
-                # Check if a popup modal window is open and active first
-                try:
-                    res_win = getattr(self, '_resolver_modal_instance', None)
-                    if res_win and res_win.winfo_exists():
-                        for child in res_win.winfo_children():
-                            if isinstance(child, ctk.CTkScrollableFrame):
-                                target = getattr(child, '_parent_canvas', None)
-                                if target:
-                                    break
-                            elif hasattr(child, '_parent_canvas') and getattr(child, '_parent_canvas', None):
-                                target = getattr(child, '_parent_canvas')
-                                break
-                except Exception:
-                    pass
-
-                # Strategy 1: Walk up widget tree from widget under mouse pointer
-                if not target:
-                    try:
-                        x = self.winfo_pointerx()
-                        y = self.winfo_pointery()
-                        under = self.winfo_containing(x, y)
-                    except Exception:
-                        under = None
-
-                    start_w = under or widget
-                    curr = start_w
-                    while curr:
-                        if hasattr(curr, '_parent_canvas') and getattr(curr, '_parent_canvas', None):
-                            target = getattr(curr, '_parent_canvas')
-                            break
-                        elif isinstance(curr, (tk.Canvas, ttk.Treeview, tk.Text)):
-                            target = curr
-                            break
-                        try:
-                            curr = getattr(curr, 'master', None)
-                        except Exception:
-                            curr = None
-
-                # Strategy 2: Active tab root scroll container fallback (FIXED: only scroll active tab)
-                if not target:
-                    try:
-                        active_tab = self.tabview.get() if hasattr(self, 'tabview') else None
-                        if active_tab:
-                            tab_attr_map = {
-                                "👥 People Sorter": "people_scroll",
-                                "🔍 Duplicates Finder": "dup_main_scroll",
-                                "📅 File Organizer": "organizer_scroll",
-                                "🧹 Storage Cleaner": "cleaner_scroll",
-                                "📦 Subfolder Extractor": "extractor_scroll",
-                                "🏷️ Bulk Renamer": "renamer_scroll",
-                                "🪄 Magic Converter": "converter_scroll",
-                                "🚫 Exclusions": "exclusions_scroll",
-                                "📊 Analytics": "insights_scroll",
-                                "👁️ Auto Watcher": "watcher_scroll"
-                            }
-                            # CRITICAL FIX: Only use the ACTIVE tab's scroll container, not first-found
-                            attr_name = tab_attr_map.get(active_tab)
-                            if attr_name:
-                                f_obj = getattr(self, attr_name, None)
-                                if f_obj and hasattr(f_obj, '_parent_canvas'):
-                                    target_canvas = getattr(f_obj, '_parent_canvas', None)
-                                    if target_canvas:
-                                        target = target_canvas
-                    except Exception:
-                        pass
-
-                if target:
-                    try:
-                        if hasattr(target, 'winfo_exists') and not target.winfo_exists():
-                            target = None
-                        else:
-                            target.yview_scroll(scroll_units, "units")
-                            try:
-                                target.update_idletasks()
-                            except Exception:
-                                pass
-                            return "break"
-                    except Exception:
-                        pass
-
-            try:
-                self.unbind_all("<MouseWheel>")
-                self.unbind_all("<Button-4>")
-                self.unbind_all("<Button-5>")
-            except Exception:
-                pass
-
-            try:
-                self.bind_all("<MouseWheel>", _on_global_mousewheel)
-                self.bind_all("<Button-4>", _on_global_mousewheel)
-                self.bind_all("<Button-5>", _on_global_mousewheel)
-            except Exception:
-                pass
-
-        def bind_mousewheel_to_container(self, container_widget, target_scrollable_frame=None):
-            """
-            Ensures container_widget delegates mousewheel scrolling to the global master scroll engine.
-            """
-            if not container_widget:
-                return
-            self.bind_mousewheel_to_widget(container_widget)
 
         def dup_log(self, message, tag="info"):
             """Streams color-coded live execution logs into the Duplicate tab's real-time log console."""
@@ -3299,7 +3078,6 @@ if HAS_CUSTOMTKINTER:
             self._resolver_modal_ref = modal  # Store reference for lift-to-front
             modal.title("🔍 Pro Duplicate Conflict Resolver Suite")
             modal.transient(self)
-            self.bind_mousewheel_to_widget(modal)
             # Do NOT call grab_set() here — do it after the window is shown
 
             def on_modal_close():
@@ -3798,7 +3576,6 @@ if HAS_CUSTOMTKINTER:
 
             gallery_scroll = ctk.CTkScrollableFrame(modal, corner_radius=12, fg_color="transparent")
             gallery_scroll.pack(fill="both", expand=True, padx=12, pady=(0, 6))
-            self.bind_mousewheel_to_widget(gallery_scroll)
 
             bot_bar = ctk.CTkFrame(modal, corner_radius=10, fg_color=("gray85", "gray20"))
             bot_bar.pack(fill="x", padx=12, pady=(0, 8), ipadx=6, ipady=4)
@@ -4488,7 +4265,6 @@ if HAS_CUSTOMTKINTER:
 
             render_active_group()
             update_bulk_bar_ui()
-            self.bind_mousewheel_to_container(modal)
 
             # Bring modal to front and activate grab AFTER the window is fully built and rendered
             def _finalize_modal():
@@ -4583,8 +4359,6 @@ if HAS_CUSTOMTKINTER:
                     height=30,
                     width=190
                 ).pack(side="left", padx=4)
-
-            self.bind_mousewheel_to_container(self.dup_cards_scroll)
 
         def load_all_dup_cards(self):
             all_groups = getattr(self, "dup_groups", [])
