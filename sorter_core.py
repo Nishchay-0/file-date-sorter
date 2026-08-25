@@ -561,18 +561,35 @@ def is_random_or_hash_name(filename_or_basename):
     return False, f"Regular human name ('{base_name}')"
 
 
+def strip_all_extensions(filename_or_basename):
+    """
+    Iteratively strips compound file extensions (e.g. '.zip.nomedia', '.jpg.nomedia', '.tar.gz', '.mp4.tmp').
+    """
+    if not filename_or_basename:
+        return ""
+    name = os.path.basename(filename_or_basename)
+    while True:
+        base, ext = os.path.splitext(name)
+        if ext and len(ext) > 1 and ' ' not in ext:
+            name = base
+        else:
+            break
+    return name
+
+
 def extract_clean_title_prefix(filename_or_basename):
     """
     Extracts the core topic / brand / title name of a file by stripping:
-      1. Copy/duplicate suffixes (e.g. ' (1)', ' - Copy').
-      2. Leading dates/timestamps (e.g. '2022-02-25_', '20240101_123456_').
-      3. Generic export prefixes (e.g. 'media~', 'export~', 'backup~').
-      4. Trailing date/timestamp/ID/numeric/counter suffixes (e.g. '-1499352345', '_20230809_190350_257').
+      1. Compound file extensions (e.g. '.zip.nomedia', '.jpg.nomedia', '.tar.gz').
+      2. Copy/duplicate suffixes (e.g. ' (1)', ' - Copy').
+      3. Leading dates/timestamps (e.g. '2022-02-25_', '20240101_123456_').
+      4. Generic export prefixes (e.g. 'media~', 'export~', 'backup~').
+      5. Trailing date/timestamp/ID/numeric/counter suffixes (e.g. '-1499352345', '_20230809_190350_257').
 
     Examples:
+      - 'Snapchat-235837277.zip.nomedia'           -> 'Snapchat'
       - '2022-02-25_media~Snapchat-1499352345.jpg' -> 'Snapchat'
       - '2022-05-12_media~Snapchat-1104223881.mp4' -> 'Snapchat'
-      - 'Snapchat-1134819576.jpg'                  -> 'Snapchat'
       - 'ANSHI-VID_20230809_190350_257.mp4'       -> 'ANSHI-VID'
       - 'VID_101211201_003350.mp4'                -> 'VID'
       - 'ansh_true.jpg'                           -> 'ansh_true'
@@ -580,7 +597,9 @@ def extract_clean_title_prefix(filename_or_basename):
     """
     if not filename_or_basename:
         return ""
-    base_name = os.path.splitext(os.path.basename(filename_or_basename))[0].strip()
+    
+    # 0. Strip all compound extensions (.zip.nomedia, .jpg, etc.)
+    base_name = strip_all_extensions(filename_or_basename).strip()
     if not base_name:
         return ""
 
