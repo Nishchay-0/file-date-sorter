@@ -200,6 +200,7 @@ if HAS_CUSTOMTKINTER:
             self._thumb_cache = {}
 
             # Core Shared Tkinter State Variables (Initialized before UI tab setup)
+            self.status_var = tk.StringVar(value="Ready — select a target folder or pick files to begin.")
             self.dir_var = tk.StringVar()
             self.dest_dir_var = tk.StringVar()
             self.dup_dir_var = tk.StringVar()
@@ -537,34 +538,41 @@ if HAS_CUSTOMTKINTER:
                     else:
                         self.set_target_dir(arg_target)
 
-            # ── Glass Status Bar ───────────────────────────────────────────────
+            # ── Sleek Apple Glass Status Bar Footer ────────────────────────────
             status_card = ctk.CTkFrame(
                 self,
-                height=34,
-                corner_radius=10,
-                fg_color=GLASS["bg_card"] if HAS_THEME else None,
-                border_color=GLASS["border_accent"] if HAS_THEME else None,
+                height=26,
+                corner_radius=6,
+                fg_color=GLASS["bg_card"] if HAS_THEME else ("gray85", "gray18"),
+                border_color=GLASS["border"] if HAS_THEME else ("gray75", "gray30"),
                 border_width=1 if HAS_THEME else 0
             )
-            status_card.pack(fill="x", padx=10, pady=(0, 8))
+            status_card.pack(fill="x", padx=10, pady=(2, 6))
 
-            # Accent left stripe
-            if HAS_THEME:
-                stripe = ctk.CTkFrame(status_card, width=4, corner_radius=0,
-                                      fg_color=GLASS["border_accent"])
-                stripe.pack(side="left", fill="y")
+            # Status content row
+            status_inner = ctk.CTkFrame(status_card, fg_color="transparent")
+            status_inner.pack(fill="x", padx=8, pady=2)
 
-            self.status_var = tk.StringVar(value="✦ Ready — select a target folder or pick files to begin.")
-            self.status_lbl = ctk.CTkLabel(
-                status_card,
-                textvariable=self.status_var,
-                font=ctk.CTkFont(family="Segoe UI", size=11),
-                anchor="w",
-                text_color=GLASS["text_secondary"] if HAS_THEME else None
+            self.status_dot = ctk.CTkLabel(
+                status_inner,
+                text="●",
+                font=ctk.CTkFont(size=9, weight="bold"),
+                text_color=GLASS["accent_green_dk"] if HAS_THEME else "#4caf50",
+                width=14
             )
-            self.status_lbl.pack(side="left", padx=10, fill="x", expand=True)
+            self.status_dot.pack(side="left")
 
-            # Start idle pulse animation on status dot
+            if not hasattr(self, 'status_var') or self.status_var is None:
+                self.status_var = tk.StringVar(value="Ready — select a target folder or pick files to begin.")
+            self.status_lbl = ctk.CTkLabel(
+                status_inner,
+                textvariable=self.status_var,
+                font=ctk.CTkFont(family="Segoe UI", size=10),
+                anchor="w",
+                text_color=GLASS["text_secondary"] if HAS_THEME else "gray60"
+            )
+            self.status_lbl.pack(side="left", padx=4, fill="x", expand=True)
+
             self._start_status_pulse()
 
         def _atomic_repaint_tab_widgets(self, tab_container=None):

@@ -443,16 +443,56 @@ def setup_duplicates_tab(gui_instance):
     gui_instance.placeholder_lbl = ctk.CTkLabel(gui_instance.dup_cards_scroll, text="Click '🔍 Scan Duplicates' to display side-by-side file conflict cards.", font=ctk.CTkFont(size=12, weight="bold"), text_color="gray50")
     gui_instance.placeholder_lbl.pack(pady=30)
 
-    # Real-Time Activity Log Console (Identical to File Organiser page!)
-    gui_instance.dup_log_card = ctk.CTkFrame(main_container, corner_radius=16)
-    gui_instance.dup_log_card.pack(fill="x", pady=(6, 8), ipadx=8, ipady=6)
+    # Real-Time Activity Log Console (Integrated with Live Status)
+    gui_instance.dup_log_card = ctk.CTkFrame(
+        main_container,
+        corner_radius=12,
+        fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray17"),
+        border_color=GLASS["border"] if HAS_THEME else ("gray70", "gray30"),
+        border_width=1
+    )
+    gui_instance.dup_log_card.pack(fill="x", pady=(6, 6), ipadx=6, ipady=4)
 
     dup_log_hdr = ctk.CTkFrame(gui_instance.dup_log_card, fg_color="transparent")
-    dup_log_hdr.pack(fill="x", padx=12, pady=(6, 2))
-    ctk.CTkLabel(dup_log_hdr, text="⚡ Real-Time Activity Log Console", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")).pack(side="left")
+    dup_log_hdr.pack(fill="x", padx=10, pady=(6, 4))
+    dup_log_hdr.grid_columnconfigure(1, weight=1)
 
-    gui_instance.dup_log_textbox = ctk.CTkTextbox(gui_instance.dup_log_card, height=130, font=ctk.CTkFont(family="Consolas", size=10))
-    gui_instance.dup_log_textbox.pack(fill="both", expand=True, padx=12, pady=(2, 6))
+    ctk.CTkLabel(
+        dup_log_hdr,
+        text="⚡ Real-Time Activity Log Console",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")
+    ).grid(row=0, column=0, sticky="w")
+
+    # Integrated Live Status Pill Label in console header
+    gui_instance.dup_console_status_lbl = ctk.CTkLabel(
+        dup_log_hdr,
+        textvariable=gui_instance.status_var,
+        font=ctk.CTkFont(family="Segoe UI", size=10),
+        text_color=GLASS["accent_blue_dk"] if HAS_THEME else "#0288d1",
+        anchor="e"
+    )
+    gui_instance.dup_console_status_lbl.grid(row=0, column=1, sticky="e", padx=(8, 8))
+
+    clear_btn = ctk.CTkButton(
+        dup_log_hdr,
+        text="🗑️ Clear",
+        command=gui_instance.clear_dup_log,
+        font=ctk.CTkFont(size=10),
+        width=60,
+        height=22,
+        corner_radius=6,
+        fg_color=GLASS["bg_hover"] if HAS_THEME else ("gray75", "gray25"),
+        text_color=GLASS["text_primary"] if HAS_THEME else ("gray10", "gray90")
+    )
+    clear_btn.grid(row=0, column=2, sticky="e")
+
+    gui_instance.dup_log_textbox = ctk.CTkTextbox(
+        gui_instance.dup_log_card,
+        height=110,
+        font=ctk.CTkFont(family="Consolas", size=10),
+        corner_radius=8
+    )
+    gui_instance.dup_log_textbox.pack(fill="both", expand=True, padx=10, pady=(2, 6))
 
     try:
         tb = gui_instance.dup_log_textbox._textbox

@@ -508,17 +508,57 @@ def setup_organizer_tab(gui_instance):
     gui_instance.progress_bar.set(0)
     gui_instance.progress_bar.grid(row=0, column=3, sticky="ew", padx=6)
 
-    # Live Execution Console Log Card
-    log_card = ctk.CTkFrame(scroll, corner_radius=16)
-    log_card.grid(row=6, column=0, sticky="ew", pady=(0, 8), ipadx=8, ipady=6)
+    # Live Execution Console Log Card (Integrated with Live Status)
+    log_card = ctk.CTkFrame(
+        scroll,
+        corner_radius=12,
+        fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray17"),
+        border_color=GLASS["border"] if HAS_THEME else ("gray70", "gray30"),
+        border_width=1
+    )
+    log_card.grid(row=6, column=0, sticky="ew", pady=(0, 6), ipadx=6, ipady=4)
     log_card.grid_columnconfigure(0, weight=1)
 
     log_hdr = ctk.CTkFrame(log_card, fg_color="transparent")
-    log_hdr.pack(fill="x", padx=12, pady=(6, 2))
-    ctk.CTkLabel(log_hdr, text="5. Real-Time Activity Log Console", font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")).pack(side="left")
+    log_hdr.pack(fill="x", padx=10, pady=(6, 4))
+    log_hdr.grid_columnconfigure(1, weight=1)
 
-    gui_instance.log_textbox = ctk.CTkTextbox(log_card, height=130, font=ctk.CTkFont(family="Consolas", size=10))
-    gui_instance.log_textbox.pack(fill="both", expand=True, padx=12, pady=(2, 6))
+    ctk.CTkLabel(
+        log_hdr,
+        text="5. Real-Time Activity Log Console",
+        font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold")
+    ).grid(row=0, column=0, sticky="w")
+
+    # Integrated Live Status Pill Label in console header
+    gui_instance.sorter_console_status_lbl = ctk.CTkLabel(
+        log_hdr,
+        textvariable=gui_instance.status_var,
+        font=ctk.CTkFont(family="Segoe UI", size=10),
+        text_color=GLASS["accent_blue_dk"] if HAS_THEME else "#0288d1",
+        anchor="e"
+    )
+    gui_instance.sorter_console_status_lbl.grid(row=0, column=1, sticky="e", padx=(8, 8))
+
+    clear_sorter_btn = ctk.CTkButton(
+        log_hdr,
+        text="🗑️ Clear",
+        command=lambda: gui_instance.log_textbox._textbox.delete("1.0", "end") if hasattr(gui_instance, "log_textbox") else None,
+        font=ctk.CTkFont(size=10),
+        width=60,
+        height=22,
+        corner_radius=6,
+        fg_color=GLASS["bg_hover"] if HAS_THEME else ("gray75", "gray25"),
+        text_color=GLASS["text_primary"] if HAS_THEME else ("gray10", "gray90")
+    )
+    clear_sorter_btn.grid(row=0, column=2, sticky="e")
+
+    gui_instance.log_textbox = ctk.CTkTextbox(
+        log_card,
+        height=110,
+        font=ctk.CTkFont(family="Consolas", size=10),
+        corner_radius=8
+    )
+    gui_instance.log_textbox.pack(fill="both", expand=True, padx=10, pady=(2, 6))
 
     try:
         tb = gui_instance.log_textbox._textbox
