@@ -524,9 +524,9 @@ if HAS_CUSTOMTKINTER:
             )
             main_card.pack(fill="both", expand=True, padx=10, pady=(0, 4))
 
-            # ── Right Sidebar Toolbar ──────────────────────────────────────────
+            # ── Left Sidebar Toolbar ───────────────────────────────────────────
             self.sidebar = RightSidebarToolbar(main_card, self)
-            self.sidebar.pack(side="right", fill="y", padx=(2, 4), pady=4)
+            self.sidebar.pack(side="left", fill="y", padx=(4, 2), pady=4)
 
             # ── Tab Navigation View ────────────────────────────────────────────
             self.tabview = ctk.CTkTabview(
@@ -543,7 +543,7 @@ if HAS_CUSTOMTKINTER:
                 segmented_button_unselected_hover_color=GLASS["bg_hover"] if HAS_THEME else None,
                 text_color=GLASS["text_primary"] if HAS_THEME else None,
             )
-            self.tabview.pack(side="left", fill="both", expand=True, padx=(4, 2), pady=4)
+            self.tabview.pack(side="right", fill="both", expand=True, padx=(2, 4), pady=4)
 
             self.tab_organizer = self.tabview.add("📅 File Organizer")
             self.tab_duplicates = self.tabview.add("🔍 Duplicates Finder")

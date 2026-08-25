@@ -1,8 +1,8 @@
 ﻿"""
-sidebar.py — Right-Side Collapsible Toolbar Navigation
+sidebar.py — Left-Side Collapsible Toolbar Navigation
 Smart File Organizer Suite Pro
 
-Implements a sleek vertical sidebar toolbar on the right side of the window
+Implements a sleek vertical sidebar toolbar on the left side of the window
 with glassmorphism styling, tool switching buttons, and one-click expand/collapse.
 """
 
@@ -35,9 +35,9 @@ TOOLS = [
 ]
 
 
-class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
+class LeftSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
     """
-    Vertical sidebar toolbar positioned on the right side of the main application.
+    Vertical sidebar toolbar positioned on the left side of the main application.
     Supports full mode (Icons + Labels, width ~150px) and collapsed mode (Icons only, width ~48px).
     """
     def __init__(self, parent, app_instance, **kwargs):
@@ -74,7 +74,7 @@ class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
 
         self.toggle_btn = ctk.CTkButton(
             hdr_frame,
-            text="⏩ Collapse",
+            text="⏮️ Collapse",
             command=self.toggle_collapse,
             font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
             height=26,
@@ -143,8 +143,13 @@ class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
                 btn.configure(text=tool["icon"], anchor="center")
         else:
             self.configure(width=148)
-            self.toggle_btn.configure(text="⏩ Collapse")
+            self.toggle_btn.configure(text="⏮️ Collapse")
             for item in self.buttons.values():
                 btn = item["widget"]
                 tool = item["tool"]
                 btn.configure(text=f"{tool['icon']}  {tool['short']}", anchor="w")
+
+
+# Aliases for compatibility
+RightSidebarToolbar = LeftSidebarToolbar
+SidebarToolbar = LeftSidebarToolbar
