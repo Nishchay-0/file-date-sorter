@@ -563,18 +563,20 @@ def is_random_or_hash_name(filename_or_basename):
 
 def extract_clean_title_prefix(filename_or_basename):
     """
-    Extracts the clean title prefix of a filename by stripping trailing date,
-    timestamp, sequence counter, version, and copy suffixes (e.g. '_20230809_190350_257',
-    '_101211201_003350', '_v1', ' (1)', ' - Copy').
-    
+    Extracts the core topic / brand / title name of a file by stripping:
+      1. Copy/duplicate suffixes (e.g. ' (1)', ' - Copy').
+      2. Leading dates/timestamps (e.g. '2022-02-25_', '20240101_123456_').
+      3. Generic export prefixes (e.g. 'media~', 'export~', 'backup~').
+      4. Trailing date/timestamp/ID/numeric/counter suffixes (e.g. '-1499352345', '_20230809_190350_257').
+
     Examples:
-      - 'ANSHI-VID_20230809_190350_257' -> 'ANSHI-VID'
-      - 'VID_101211201_003350'          -> 'VID'
-      - 'VID_115910705_194017'          -> 'VID'
-      - 'ansh_true'                     -> 'ansh_true'
-      - 'ansh_rao'                      -> 'ansh_rao'
-      - 'IMG_20240101_123456'           -> 'IMG'
-      - 'My_Vacation_Photo'             -> 'My_Vacation_Photo'
+      - '2022-02-25_media~Snapchat-1499352345.jpg' -> 'Snapchat'
+      - '2022-05-12_media~Snapchat-1104223881.mp4' -> 'Snapchat'
+      - 'Snapchat-1134819576.jpg'                  -> 'Snapchat'
+      - 'ANSHI-VID_20230809_190350_257.mp4'       -> 'ANSHI-VID'
+      - 'VID_101211201_003350.mp4'                -> 'VID'
+      - 'ansh_true.jpg'                           -> 'ansh_true'
+      - 'ansh_rao.png'                            -> 'ansh_rao'
     """
     if not filename_or_basename:
         return ""
@@ -582,40 +584,44 @@ def extract_clean_title_prefix(filename_or_basename):
     if not base_name:
         return ""
 
-    # First, strip copy suffixes like ' (1)', ' - Copy', etc.
-    base_name = re.sub(r'(\s*\(\d+\)|\s*[-_]\s*copy.*)$', '', base_name, flags=re.IGNORECASE).strip('_- ')
+    # 1. Strip copy/duplicate suffixes: ' (1)', ' - Copy', '_copy', etc.
+    name = re.sub(r'(\s*\(\d+\)|\s*[-_]\s*copy.*)$', '', base_name, flags=re.IGNORECASE).strip('_- ')
+
+    # 2. Strip leading dates (YYYY-MM-DD_, YYYY.MM.DD_, YYYYMMDD_, YYYYMMDD_HHMMSS_)
+    name = re.sub(r'^\d{4}[-._]\d{2}[-._]\d{2}[_.-]?', '', name)
+    name = re.sub(r'^\d{8}[_.-]\d{6}[_.-]?', '', name)
+    name = re.sub(r'^\d{8}[_.-]?', '', name)
+
+    # 3. Strip generic wrapper prefixes like 'media~', 'export~', 'backup~', 'file~'
+    name = re.sub(r'^(media|export|backup|takeout|file)[~_-]', '', name, flags=re.IGNORECASE).strip('_- ')
 
     def is_suffix_token(token):
         tok = token.strip()
         if not tok:
             return True
-        # Pure numbers (e.g., '20230809', '101211201', '003350', '257')
         if tok.isdigit():
             return True
-        # Date pattern YYYY-MM-DD or YYYY.MM.DD
         if re.match(r'^\d{4}[-._]\d{2}[-._]\d{2}$', tok):
             return True
-        # Version pattern v1, v2, v01, etc.
         if re.match(r'^v\d+$', tok, re.IGNORECASE):
             return True
-        # WhatsApp/Camera token like WA0001, IMG0001
         if re.match(r'^(WA|IMG|VID|AUD)\d+$', tok, re.IGNORECASE):
             return True
         return False
 
-    for sep in ('_', '-'):
-        if sep in base_name:
-            parts = base_name.split(sep)
+    for sep in ('~', '_', '-'):
+        if sep in name:
+            parts = name.split(sep)
             keep_idx = len(parts)
             while keep_idx > 1 and is_suffix_token(parts[keep_idx - 1]):
                 keep_idx -= 1
-            
             if keep_idx < len(parts):
-                prefix = sep.join(parts[:keep_idx]).strip('_- ')
+                prefix = sep.join(parts[:keep_idx]).strip('_-~ ')
                 if prefix:
-                    return prefix
+                    name = prefix
+                    break
 
-    return base_name
+    return name if name else base_name
 
 
 def get_name_sort_folder(filename, random_folder_name="Unsorted"):

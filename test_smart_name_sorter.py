@@ -211,6 +211,38 @@ class TestSmartNameSorter(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.test_dir, "VID_101211201_003350")))
         self.assertFalse(os.path.exists(os.path.join(self.test_dir, "VID_115910705_194017")))
 
+    def test_08_snapchat_export_media_grouping(self):
+        """
+        Verify Snapchat/Takeout export files like '2022-02-25_media~Snapchat-1499352345.jpg' and
+        'Snapchat-236253845.jpg' group under a single 'Snapchat' folder.
+        """
+        snap_files = [
+            "2022-02-25_media~Snapchat-1499352345.jpg",
+            "2022-05-12_media~Snapchat-1104223881.mp4",
+            "2022-05-29_media~Snapchat-339385.jpg",
+            "2022-06-16_media~Snapchat-1959683120.mp4",
+            "Snapchat-236253845.jpg",
+            "Snapchat-561692974.jpg",
+            "Snapchat-1170321109.jpg"
+        ]
+
+        for fname in snap_files:
+            fp = os.path.join(self.test_dir, fname)
+            with open(fp, "w") as f: f.write("snap content")
+
+        stats, _ = organize_by_name(self.test_dir, dry_run=False)
+        self.assertEqual(stats["processed"], len(snap_files))
+
+        snap_dir = os.path.join(self.test_dir, "Snapchat")
+        self.assertTrue(os.path.isdir(snap_dir))
+
+        for fname in snap_files:
+            self.assertTrue(os.path.exists(os.path.join(snap_dir, fname)))
+
+        # Verify no per-date or per-ID subfolders were created
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "2022-02-25_media~Snapchat-1499352345")))
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "Snapchat-236253845")))
+
 
 if __name__ == "__main__":
     unittest.main()
