@@ -4911,6 +4911,89 @@ if HAS_CUSTOMTKINTER:
                 self.format_lbl.grid_remove()
                 self.struct_dropdown.grid_remove()
 
+            # Smart Name extra controls
+            if "Smart" in cat or "Name" in cat:
+                if hasattr(self, "_smart_name_extra_row") and self._smart_name_extra_row:
+                    self._smart_name_extra_row.grid()
+                if hasattr(self, "show_plan_btn") and self.show_plan_btn:
+                    self.show_plan_btn.grid()
+            else:
+                if hasattr(self, "_smart_name_extra_row") and self._smart_name_extra_row:
+                    self._smart_name_extra_row.grid_remove()
+                if hasattr(self, "show_plan_btn") and self.show_plan_btn:
+                    self.show_plan_btn.grid_remove()
+
+        def show_smart_name_plan(self):
+            target_dir = self.dir_var.get().strip()
+            if not target_dir or not os.path.isdir(fix_win_long_path(target_dir)):
+                messagebox.showwarning("Target Folder Required", "Please select a valid target directory to generate a pre-sorting plan.")
+                return
+
+            subdiv_val = getattr(self, "unsorted_subdivide_var", None)
+            subdiv_str = "none"
+            if subdiv_val:
+                raw = subdiv_val.get()
+                if "Type" in raw:
+                    subdiv_str = "type"
+                elif "Month" in raw:
+                    subdiv_str = "date"
+
+            exc_folds = self.parse_comma_list(self.exclude_folders_var.get().strip())
+            exc_files = self.parse_comma_list(self.exclude_files_var.get().strip())
+            route_corr = getattr(self, "route_corrupted_var", None)
+            corr_val = route_corr.get() if route_corr else False
+
+            try:
+                from sorter_core import generate_smart_name_plan
+                plan = generate_smart_name_plan(
+                    target_dir,
+                    random_folder_name="_Random",
+                    unsorted_subdivide=subdiv_str,
+                    recursive=self.recursive_var.get(),
+                    exclude_folders=exc_folds,
+                    exclude_files=exc_files,
+                    route_corrupted=corr_val
+                )
+
+                # Show modal plan summary
+                dlg = ctk.CTkToplevel(self)
+                dlg.title("📋 Smart Name Sorting — Pre-Execution Plan")
+                dlg.geometry("640x520")
+                dlg.transient(self)
+                dlg.grab_set()
+
+                lbl = ctk.CTkLabel(dlg, text="📋 Pre-Execution Organization Plan", font=ctk.CTkFont(size=14, weight="bold"))
+                lbl.pack(padx=16, pady=(16, 6))
+
+                txt = ctk.CTkTextbox(dlg, font=ctk.CTkFont(family="Consolas", size=11))
+                txt.pack(fill="both", expand=True, padx=16, pady=8)
+
+                lines = []
+                lines.append(f"Total Files Scanned: {plan['total_files']}")
+                lines.append(f"Files to _Random: {plan['unsorted_count']}")
+                if plan.get("unsorted_breakdown"):
+                    for sub, cnt in plan["unsorted_breakdown"].items():
+                        lines.append(f"   ↳ _Random/{sub}: {cnt} file(s)")
+                lines.append(f"Proposed Word Folders: {len(plan['proposed_folders'])}")
+                lines.append("=" * 55)
+                lines.append("\n📁 Proposed Word Folders:")
+                for pf in plan["proposed_folders"]:
+                    samples = ", ".join(pf["sample_files"][:3])
+                    lines.append(f"  • {pf['name']}/ ({pf['file_count']} files) -> e.g. {samples}")
+
+                if plan.get("review_needed"):
+                    lines.append("\n🚨 Files Needing Manual Review:")
+                    for rn in plan["review_needed"]:
+                        lines.append(f"  • {os.path.basename(rn['path'])}: {rn['reason']}")
+
+                txt.insert("1.0", "\n".join(lines))
+                txt.configure(state="disabled")
+
+                close_btn = ctk.CTkButton(dlg, text="Close", command=dlg.destroy, width=100)
+                close_btn.pack(pady=(0, 16))
+            except Exception as e:
+                messagebox.showerror("Plan Error", f"Failed to generate plan: {e}")
+
         def open_target_folder(self):
             target_dir = self.dir_var.get().strip()
             if target_dir and os.path.isdir(fix_win_long_path(target_dir)):

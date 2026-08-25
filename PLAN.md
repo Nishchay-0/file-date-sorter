@@ -11,6 +11,7 @@
 | `d53b773` | **10-Tab Atomic Checkbox Sync Suite** | Added `create_atomic_checkbox` component builder and full-application 10-tab atomic state verification suite. |
 | 2026-08-25 | **Persistent Memory & GitHub Auto-Sync** | Initialized `AGENTS.md`, `CLAUDE.md`, `PLAN.md`, `docs/known-issues.md`, and `docs/constraints.md` with continuous GitHub sync rule. |
 | 2026-08-25 | **Full Bug Hunt, Stability & Audit** | Audited all 9 phases: fixed GUI converter execution arguments (`CONV-001`), CLI missing arg crash (`CLI-001`), empty folder default exclusions (`EXC-003`, `EXC-004`), duplicate move collisions (`DUP-001`), single file converter same-extension output (`CONV-002`), batch renamer camelCase tokenization (`RENAME-001`), and dead code (`DEAD-001`). Added comprehensive regression test suite `test_audit_fixes.py` (6/6 passing). |
+| 2026-08-25 | **Word-Based Sorting & Single Random Catch-All** | Implemented `extract_word_base()` extracting first meaningful alphabetical word (3+ letters, >= 1 vowel) per filename and routing to unique word folders (`amazon/`, `guru/`). All non-word / hash / gibberish files route to ONE shared `_Random/` folder. Added pre-execution plan modal, ISO date prefix renaming, and Unsorted subdivision options. 47/47 pytest + 12/12 deployment tests passing (100%). |
 
 ---
 
@@ -41,18 +42,18 @@
 | Content-aware cache key | Prevents stale cache hit when timestamp is preserved | ✅ LOCKED (Constraint 003) |
 | System Vault backup | Protects against accidental data loss with 1-click restore | ✅ LOCKED (Constraint 001) |
 | CustomTkinter UI | Fast native desktop styling with dark/light mode support | ✅ LOCKED |
+| Word-based folder grouping | Groups by first meaningful alphabetical word and consolidates all non-word files into one `_Random/` folder | ✅ LOCKED |
 
 ---
 
 ## 📋 Session Handoff Notes (2026-08-25)
 
 **What changed:**
-- Completed Full Production-Readiness Bug Hunt, Stability & Performance Audit across all 9 audit phases.
-- Fixed 8 critical, high, and medium severity bugs across GUI, CLI, Core Sorter, Converter, and Renamer modules.
-- Created `test_audit_fixes.py` (6/6 passed) validating all bug fixes and edge cases.
-- Validated master test suite: **31 passed, 2 skipped, 0 failed** across all pytest suites + **12/12 deployment tests passed (100%)**.
+- Implemented **Word-Based Sorting & Single Random Catch-All** in `sorter_core.py` via `extract_word_base()`.
+- Grouping logic creates exactly one folder per unique word (e.g. `amazon/`, `guru/`).
+- Machine hashes, UUIDs, numeric sequences, and gibberish (e.g. `323f9w8ehf8awjefi`, `hfqgifcbkj9`, `336101256_21499`) route into ONE single shared folder `_Random/`.
+- Added Unsorted subdivision by file type (`_Random/Images`, `_Random/Videos`, `_Random/Other`) or modification month (`_Random/YYYY-MM`).
+- Added ISO date prefix renaming option and pre-execution plan summary generator.
+- Added comprehensive unit tests in `test_sorter.py` (Test 5) and `test_smart_name_sorter.py` (8/8 passing).
+- Validated test suites: **47 passed in pytest (100%)** and **12/12 deployment tests passed (100%)**.
 
-**Verification Evidence:**
-- `test_audit_fixes.py`: 6 passed
-- `test_deployment.py`: 12 passed
-- Full pytest suite: 31 passed, 2 skipped

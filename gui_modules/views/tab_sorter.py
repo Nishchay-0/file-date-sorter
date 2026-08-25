@@ -171,8 +171,58 @@ def setup_organizer_tab(gui_instance):
     gui_instance.mode_segmented.set("Move")
     gui_instance.mode_segmented.grid(row=1, column=3, sticky="ew", padx=(0, 12), pady=4)
 
+    # ── Smart Name extra controls (shown only when Smart Full Name mode is active) ──
+    gui_instance._smart_name_extra_row = ctk.CTkFrame(strategy_card, fg_color="transparent")
+    gui_instance._smart_name_extra_row.grid(row=2, column=0, columnspan=4, sticky="ew", padx=12, pady=(0, 4))
+
+    ctk.CTkLabel(gui_instance._smart_name_extra_row, text="Unsorted Subdivide:",
+                 font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(0, 6))
+    gui_instance.unsorted_subdivide_var = ctk.StringVar(value="🗂️ None (Flat)")
+    gui_instance.unsorted_subdivide_dropdown = ctk.CTkOptionMenu(
+        gui_instance._smart_name_extra_row,
+        variable=gui_instance.unsorted_subdivide_var,
+        values=[
+            "🗂️ None (Flat)",
+            "📁 By File Type (Images / Videos / Other)",
+            "📅 By Month (YYYY-MM)"
+        ],
+        font=ctk.CTkFont(size=11),
+        dropdown_font=ctk.CTkFont(size=11),
+        height=28,
+        width=220
+    )
+    gui_instance.unsorted_subdivide_dropdown.pack(side="left", padx=(0, 18))
+    CTkToolTip(gui_instance.unsorted_subdivide_dropdown,
+               "Subdivide the Unsorted catch-all folder:\n• None (Flat): all random files in Unsorted/.\n• By File Type: Unsorted/Images/, Unsorted/Videos/, Unsorted/Other/.\n• By Month: Unsorted/YYYY-MM/ based on file modification date.")
+
+    gui_instance.iso_date_prefix_var = tk.BooleanVar(value=False)
+    iso_chk = ctk.CTkCheckBox(
+        gui_instance._smart_name_extra_row,
+        text="📅 ISO Date Prefix (rename to YYYY-MM-DD_filename.ext)",
+        variable=gui_instance.iso_date_prefix_var,
+        font=ctk.CTkFont(size=11, weight="bold"),
+        text_color="#00acc1"
+    )
+    iso_chk.pack(side="left", padx=(0, 18))
+    CTkToolTip(iso_chk, "When checked, renames each file with an ISO date prefix (e.g. 2026-08-25_invoice.pdf) so files sort chronologically natively in Windows/macOS.")
+
+    gui_instance.route_corrupted_var = tk.BooleanVar(value=False)
+    corr_chk = ctk.CTkCheckBox(
+        gui_instance._smart_name_extra_row,
+        text="🚨 Route Zero-Byte to Review_Corrupted/",
+        variable=gui_instance.route_corrupted_var,
+        font=ctk.CTkFont(size=11, weight="bold"),
+        text_color="#ef5350"
+    )
+    corr_chk.pack(side="left")
+    CTkToolTip(corr_chk, "Moves zero-byte / corrupted files to a separate Review_Corrupted/ folder instead of sorting them normally.")
+
+    # Hide by default (shown only when Smart Full Name is selected)
+    gui_instance._smart_name_extra_row.grid_remove()
+    # ── End Smart Name extra controls ──
+
     gui_instance.sub_options_lbl = ctk.CTkLabel(strategy_card, text="Date Src:", font=ctk.CTkFont(size=11, weight="bold"), anchor="w")
-    gui_instance.sub_options_lbl.grid(row=2, column=0, sticky="w", padx=(12, 4), pady=4)
+    gui_instance.sub_options_lbl.grid(row=3, column=0, sticky="w", padx=(12, 4), pady=4)
 
     gui_instance.date_source_var = ctk.StringVar(value="📅 Smart Auto (Filename Date -> EXIF -> File System)")
     gui_instance.date_src_dropdown = ctk.CTkOptionMenu(
@@ -190,11 +240,11 @@ def setup_organizer_tab(gui_instance):
         height=32,
         dynamic_resizing=True
     )
-    gui_instance.date_src_dropdown.grid(row=2, column=1, sticky="ew", padx=(0, 10), pady=4)
+    gui_instance.date_src_dropdown.grid(row=3, column=1, sticky="ew", padx=(0, 10), pady=4)
     CTkToolTip(gui_instance.date_src_dropdown, "Selects source for sorting dates:\n• Smart Auto: Parses embedded filename dates (e.g. 20022022), EXIF, then OS file dates.\n• Filename Embedded Date: Extracts 8-digit or ISO dates directly from filenames.")
 
     gui_instance.format_lbl = ctk.CTkLabel(strategy_card, text="Format:", font=ctk.CTkFont(size=11, weight="bold"), anchor="w")
-    gui_instance.format_lbl.grid(row=2, column=2, sticky="w", padx=(6, 4), pady=4)
+    gui_instance.format_lbl.grid(row=3, column=2, sticky="w", padx=(6, 4), pady=4)
 
     gui_instance.structure_var = ctk.StringVar(value="YYYY/MM (e.g. 2020/01)")
     gui_instance.struct_dropdown = ctk.CTkOptionMenu(
@@ -206,9 +256,9 @@ def setup_organizer_tab(gui_instance):
         height=32,
         dynamic_resizing=True
     )
-    gui_instance.struct_dropdown.grid(row=2, column=3, sticky="ew", padx=(0, 12), pady=4)
+    gui_instance.struct_dropdown.grid(row=3, column=3, sticky="ew", padx=(0, 12), pady=4)
 
-    ctk.CTkLabel(strategy_card, text="Conflicts:", font=ctk.CTkFont(size=11, weight="bold"), anchor="w").grid(row=3, column=0, sticky="w", padx=(12, 4), pady=4)
+    ctk.CTkLabel(strategy_card, text="Conflicts:", font=ctk.CTkFont(size=11, weight="bold"), anchor="w").grid(row=4, column=0, sticky="w", padx=(12, 4), pady=4)
 
     gui_instance.conflict_mode_var = ctk.StringVar(value="🛡️ Skip Conflicts (Default)")
     gui_instance.conflict_dropdown = ctk.CTkOptionMenu(
@@ -225,7 +275,7 @@ def setup_organizer_tab(gui_instance):
         height=32,
         dynamic_resizing=True
     )
-    gui_instance.conflict_dropdown.grid(row=3, column=1, columnspan=3, sticky="ew", padx=(0, 12), pady=4)
+    gui_instance.conflict_dropdown.grid(row=4, column=1, columnspan=3, sticky="ew", padx=(0, 12), pady=4)
 
     # Exclusions & Filters Card
     filter_card = ctk.CTkFrame(scroll, corner_radius=12)
@@ -349,8 +399,19 @@ def setup_organizer_tab(gui_instance):
     gui_instance.preview_stats_lbl = ctk.CTkLabel(preview_hdr, text="Files Found: 0 | Size: 0 B | Duplicates: 0", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray60")
     gui_instance.preview_stats_lbl.grid(row=0, column=2, sticky="e", padx=(0, 8))
 
+    gui_instance.show_plan_btn = ctk.CTkButton(
+        preview_hdr, text="📋 Show Plan",
+        command=gui_instance.show_smart_name_plan,
+        font=ctk.CTkFont(size=11, weight="bold"),
+        height=28, width=110, fg_color="#7b1fa2"
+    )
+    gui_instance.show_plan_btn.grid(row=0, column=3, sticky="e", padx=(0, 6))
+    CTkToolTip(gui_instance.show_plan_btn, "Shows a pre-execution plan summary: proposed folders, Unsorted count, and files needing manual review — before anything is moved.")
+    # Only show in Smart Name mode
+    gui_instance.show_plan_btn.grid_remove()
+
     gui_instance.scan_btn = ctk.CTkButton(preview_hdr, text="🔍 Scan Preview", command=gui_instance.refresh_preview, font=ctk.CTkFont(size=11, weight="bold"), height=28, width=120, fg_color="#0288d1")
-    gui_instance.scan_btn.grid(row=0, column=3, sticky="e")
+    gui_instance.scan_btn.grid(row=0, column=4, sticky="e")
 
     tree_frame = ctk.CTkFrame(preview_card, corner_radius=8, fg_color=("gray95", "gray15"))
     tree_frame.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))

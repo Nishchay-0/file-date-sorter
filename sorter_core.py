@@ -502,170 +502,156 @@ def strip_all_extensions(filename_or_basename):
     return name
 
 
+CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyz]{4,}', re.IGNORECASE)
+
+
+def extract_word_base(filename):
+    """
+    Extracts the first meaningful alphabetical word from a filename:
+    - Strips extension.
+    - Filters out machine hashes, pure numbers, UUIDs, and interleaved random strings.
+    - Finds the first contiguous alphabetical sequence of 3 or more letters with at least one vowel.
+    - Filters out consonant clusters (4+ consecutive consonants) and invalid vowel ratios.
+    - Returns the matched word (lowercased) if found, or None if no meaningful word is found.
+
+    Examples:
+      'amazon_order_123.pdf' -> 'amazon'
+      'guru_finance_2024.xls' -> 'guru'
+      'invoice_001.pdf' -> 'invoice'
+      '336101256_21499838751079_308.jpg' -> None
+      'hfqgifcbkj9.png' -> None
+      '323f9w8ehf8awjefi.docx' -> None
+    """
+    if not filename:
+        return None
+
+    stem = strip_all_extensions(filename).strip()
+    if not stem:
+        return None
+
+    # UUID Check
+    if UUID_REGEX.match(stem):
+        return None
+
+    # Pure numeric strings (e.g. 336101256, 123456789)
+    if stem.isdigit():
+        return None
+
+    # Separator-only or punctuation-only artifacts
+    if re.match(r'^[\s_\-\.]+$', stem):
+        return None
+
+    # Hexadecimal hash >= 12 chars (e.g. MD5, SHA1, SHA256)
+    if HEX_HASH_REGEX.match(stem) and any(c.isdigit() for c in stem) and any(c.isalpha() for c in stem):
+        return None
+
+    # Meta / Facebook / Instagram CDN ID pattern
+    if META_CDN_REGEX.match(stem):
+        return None
+
+    # Interleaved hash/random alphanumeric strings (e.g. 323f9w8ehf8awjefi, 4f8a2c9e1b)
+    if re.search(r'\d+[a-zA-Z]\d+|\d+[a-zA-Z]{1,2}\d+', stem):
+        return None
+
+    # Multi-digit numeric ID sequences with separators (12+ digits with no word letters)
+    clean_no_sep = re.sub(r'[_\-\.\s]', '', stem)
+    if clean_no_sep.isdigit() and len(clean_no_sep) >= 10:
+        return None
+
+    # Find alphabetical word sequences of 3+ letters
+    tokens = re.findall(r'[a-zA-Z]+', stem)
+    for token in tokens:
+        if len(token) < 3:
+            continue
+        t = token.lower()
+        vowels = sum(1 for c in t if c in 'aeiou')
+        if vowels == 0:
+            continue
+        # Exclude consonant clusters (4+ consecutive consonants)
+        if CONSONANT_CLUSTER_REGEX.search(t):
+            continue
+        # Minimum vowel ratio (at least 20% vowels)
+        if (vowels / len(t)) < 0.20:
+            continue
+        return t
+
+    return None
+
+
 def is_random_or_hash_name(filename_or_basename):
     """
-    Detects if a filename is clearly machine-generated / random hash vs a human-named file.
+    Checks if a filename lacks a meaningful alphabetical word base.
     Returns (is_random: bool, reason: str).
-
-    Conservative Policy:
-      - Deterministic machine identifiers (UUID, MD5/SHA hashes >= 12 chars, Meta CDN IDs, pure numeric IDs) -> Random (Unsorted)
-      - Human names, alphanumeric names (Nishchay2405, invoice2026final), names with separators -> Human Named
-      - If uncertain -> Human Named (default to PRESERVE)
     """
-    if not filename_or_basename:
-        return False, "Empty filename"
-
-    base_name = strip_all_extensions(filename_or_basename).strip()
-    if not base_name:
-        return False, "Empty base filename"
-
-    # 1. UUID Check
-    if UUID_REGEX.match(base_name):
-        return True, f"UUID machine-generated identifier ('{base_name}')"
-
-    # 2. Pure short numeric folder names (0, 1, 2, 05, 27, 28) - machine-generated sequence IDs
-    if base_name.isdigit():
-        return True, f"Short numeric machine ID ('{base_name}')"
-
-    # 2b. Separator-only or punctuation-only names like '_', '--', '__' - meaningless system artifacts
-    if re.match(r'^[\s_\-\.]+$', base_name):
-        return True, f"Separator/punctuation-only machine artifact ('{base_name}')"
-
-    # 3. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars with at least one hex letter)
-    if HEX_HASH_REGEX.match(base_name) and any(c.lower() in 'abcdef' for c in base_name):
-        return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
-
-    # 4. Meta / Facebook / Instagram CDN Hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
-    if META_CDN_REGEX.match(base_name):
-        return True, f"Facebook/Instagram/Meta CDN machine hash ID ('{base_name}')"
-
-    # 5. Hex hash + streaming CDN media suffix (e.g. 3E4396DAE40C47DA_video_dashinit, 7B4E3C_transcode_output_dashinit)
-    cdn_stripped = CDN_MEDIA_SUFFIX_REGEX.sub('', base_name)
-    if cdn_stripped != base_name and HEX_HASH_REGEX.match(cdn_stripped):
-        return True, f"Hex hash + CDN media stream suffix ('{base_name}')"
-
-    # 5b. Hex hash prefix (16+ hex chars) with any export/transcode suffix (match hex part first)
-    hex_prefix_match = re.match(r'^([0-9a-fA-F]{16,})[_\-]', base_name)
-    if hex_prefix_match:
-        leading_hex = hex_prefix_match.group(1)
-        if any(c.lower() in 'abcdef' for c in leading_hex) or len(leading_hex) >= 20:
-            return True, f"Hex hash ID ({len(leading_hex)} hex chars) with export suffix ('{base_name}')"
-
-    # 6. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702 >= 12 digits)
-    clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
-    if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
-        return True, f"Numeric machine ID sequence ({len(clean_no_sep)} digits) ('{base_name}')"
-
-    # 7. Separator Check: Names with '_', '-', ' ', '.' indicate human structured naming
-    has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
-    if has_separator:
-        return False, f"Structured human name with separators ('{base_name}')"
-
-    name_len = len(base_name)
-    if name_len < 10:
-        return False, f"Short human name (<10 chars) ('{base_name}')"
-
-    # Check for presence of common human word roots
-    base_lower = base_name.lower()
-    for root in COMMON_HUMAN_WORD_ROOTS:
-        if root in base_lower:
-            return False, f"Contains human word root '{root}' ('{base_name}')"
-
-    # Check CamelCase / TitleCase word boundaries (e.g. Project2026Report, Vacation2024Photos, Nishchay2405)
-    has_uppercase = any(c.isupper() for c in base_name)
-    has_lowercase = any(c.islower() for c in base_name)
-    if has_uppercase and has_lowercase:
-        camel_words = re.findall(r'[A-Z][a-z]+|\d+', base_name)
-        if len(camel_words) >= 2 or (len(camel_words) == 1 and any(c.isdigit() for c in base_name)):
-            return False, f"CamelCase/TitleCase human structured name ('{base_name}')"
-
-    # Pure alphabetic words with normal vowel ratio -> Human word
-    has_digits = any(c.isdigit() for c in base_name)
-    has_letters = any(c.isalpha() for c in base_name)
-    vowels = set('aeiouAEIOU')
-    vowel_count = sum(1 for c in base_name if c in vowels)
-    vowel_ratio = vowel_count / float(name_len)
-
-    if not has_digits and has_letters and 0.20 <= vowel_ratio <= 0.70:
-        return False, f"Alphabetic human word ('{base_name}')"
-
-    # High entropy unstructured random alphanumeric strings without dictionary roots
-    char_counts = {}
-    for c in base_name:
-        char_counts[c] = char_counts.get(c, 0) + 1
-    entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
-
-    if name_len >= 16 and entropy > 3.0:
-        return True, f"Random high-entropy alphanumeric string ({name_len} chars, entropy {entropy:.2f}) ('{base_name}')"
-
-    return False, f"Regular human name ('{base_name}')"
+    word = extract_word_base(filename_or_basename)
+    if word:
+        return False, f"Meaningful word base '{word}' found"
+    return True, "No meaningful word found in filename"
 
 
 def extract_clean_title_prefix(filename_or_basename):
     """
-    Extracts the core topic / brand / title name of a file by stripping ONLY:
-      1. Compound file extensions (e.g. '.zip.nomedia', '.jpg.nomedia', '.tar.gz').
-      2. Duplicate/copy suffixes (e.g. ' (1)', ' (2)', ' - Copy', '_copy').
-      3. Recognized platform export patterns (e.g. 'Snapchat-235837277' -> 'Snapchat',
-         '2022-02-25_media~Snapchat-1499352345' -> 'Snapchat').
-      4. Recognized structured camera/video timestamp patterns (e.g.
-         'ANSHI-VID_20230809_190350_257' -> 'ANSHI-VID',
-         'VID_101211201_003350' -> 'VID').
-
-    IMPORTANT: Legitimate human numeric suffixes (e.g. 'invoice-1042', 'report-2026',
-    'project-42', 'Nishchay-2405', 'Vacation-2026') MUST be preserved completely.
+    Returns the first extracted word base for a filename, or empty string.
     """
-    if not filename_or_basename:
-        return ""
-    
-    # 0. Strip compound extensions (.zip.nomedia, .jpg, etc.)
-    base_name = strip_all_extensions(filename_or_basename).strip()
-    if not base_name:
-        return ""
-
-    # 1. Recognized Platform Export (Snapchat, Instagram, Takeout, etc.)
-    # e.g. 2022-02-25_media~Snapchat-1499352345, Snapchat-236253845
-    plat_match = re.search(r'(?:^|[\d_\.\-~])(Snapchat|Instagram|TikTok|Facebook|Twitter|WhatsApp|Takeout)[~_\-]', base_name, re.IGNORECASE)
-    if plat_match:
-        plat_name = plat_match.group(1).capitalize()
-        if plat_name.lower() == 'whatsapp': plat_name = 'WhatsApp'
-        elif plat_name.lower() == 'tiktok': plat_name = 'TikTok'
-        elif plat_name.lower() == 'snapchat': plat_name = 'Snapchat'
-        return plat_name
-
-    # 2. Recognized Structured Camera / Video Pattern
-    # e.g. ANSHI-VID_20230809_190350_257, VID_20230308_214221, VID_101211201_003350, IMG_20230101_120000
-    cam_match = re.match(r'^([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*?)[_-](\d{4,}[_-]\d{4,}(?:[_-]\d+)*|\d{8,}[_-]\d{6,}|\d{8,})$', base_name)
-    if cam_match:
-        return cam_match.group(1)
-
-    # 3. Strip ONLY recognized duplicate / copy suffixes: ' (1)', ' (2)', ' - Copy', '_copy', etc.
-    clean_title = re.sub(r'(\s*\(\d+\)|\s*[-_]\s*copy.*|\s*[-_]\s*copy)$', '', base_name, flags=re.IGNORECASE).strip('_- ')
-    if clean_title:
-        return clean_title
-
-    # 4. Default: Preserve the complete filename stem (e.g. invoice-1042, report-2026, project-42, Nishchay-2405)
-    return base_name
+    word = extract_word_base(filename_or_basename)
+    return word if word else ""
 
 
-def get_name_sort_folder(filename, random_folder_name="Unsorted"):
+# File category buckets used for Unsorted subdivision
+_UNSORTED_IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.heic', '.raw', '.tiff', '.ico', '.cr2', '.nef', '.dng'}
+_UNSORTED_VIDEO_EXTS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.ts', '.m2ts', '.vob', '.mpg', '.mpeg', '.m2v', '.divx', '.ogv'}
+
+
+def get_unsorted_subfolder(filepath, subdivide='none'):
     """
-    Computes destination subfolder for Smart Full-Name Matching mode:
-      - If filename is flagged as machine-generated/hash-like: routes to single catch-all folder (e.g. 'Unsorted').
-      - Otherwise: strips copy suffixes or camera/export prefixes to group related files (e.g. 'ANSHI-VID_...' -> 'ANSHI-VID/').
+    Returns the sub-path inside the catch-all Random folder when subdivision is enabled.
+    subdivide options:
+      'none' : flat — all random files in _Random/ (default)
+      'type' : by file category — _Random/Images/, _Random/Videos/, _Random/Other/
+      'date' : by modification month — _Random/YYYY-MM/
+    Returns '' (empty string) for 'none', otherwise the sub-path.
+    """
+    if not subdivide or subdivide == 'none':
+        return ''
+    if subdivide == 'type':
+        ext = os.path.splitext(filepath)[1].lower()
+        if ext in _UNSORTED_IMAGE_EXTS:
+            return 'Images'
+        elif ext in _UNSORTED_VIDEO_EXTS:
+            return 'Videos'
+        else:
+            return 'Other'
+    if subdivide == 'date':
+        try:
+            mtime = os.path.getmtime(fix_win_long_path(filepath))
+            dt = datetime.fromtimestamp(mtime)
+            return f"{dt.year:04d}-{dt.month:02d}"
+        except Exception:
+            return 'Unknown'
+    return ''
+
+
+def get_name_sort_folder(filename, random_folder_name="_Random", filepath=None, unsorted_subdivide='none'):
+    """
+    Computes destination subfolder for Word-Based Name Matching:
+      - Extracts the first meaningful alphabetical word (e.g. 'amazon', 'guru', 'invoice').
+      - If found: routes to folder named after the word.
+      - If no meaningful word found: routes to ONE shared catch-all folder (default: '_Random'),
+        optionally subdivided by type or date via unsorted_subdivide.
     Returns (folder_name: str, is_random: bool, reason: str).
     """
-    is_random, reason = is_random_or_hash_name(filename)
+    word = extract_word_base(filename)
+    if word:
+        return word, False, f"Extracted word base '{word}'"
 
-    if is_random:
-        folder_name = random_folder_name if (random_folder_name and str(random_folder_name).strip()) else "Unsorted"
+    base_name = random_folder_name if (random_folder_name and str(random_folder_name).strip()) else "_Random"
+    if unsorted_subdivide and unsorted_subdivide != 'none' and filepath:
+        sub = get_unsorted_subfolder(filepath, unsorted_subdivide)
+        folder_name = os.path.join(base_name, sub) if sub else base_name
     else:
-        folder_name = extract_clean_title_prefix(filename)
-        if not folder_name:
-            base_name = os.path.splitext(os.path.basename(filename))[0].strip()
-            folder_name = base_name if base_name else "Unnamed"
+        folder_name = base_name
 
-    return folder_name, is_random, reason
+    return folder_name, True, "No meaningful word found (routed to random catch-all)"
 
 
 def get_alphabetical_folder(filename):
@@ -682,9 +668,11 @@ def get_alphabetical_folder(filename):
         return "Symbols & Others"
 
 
-def get_destination_folder(base_folder, filepath, sort_category, date_source='ctime', structure_format='YYYY/MM', is_duplicate=False, isolate_duplicates=False, dest_folder=None, random_folder_name="Unsorted"):
+def get_destination_folder(base_folder, filepath, sort_category, date_source='ctime', structure_format='YYYY/MM', is_duplicate=False, isolate_duplicates=False, dest_folder=None, random_folder_name="_Random", unsorted_subdivide='none'):
     """
     Generates target folder path depending on sort_category & optional custom dest_folder.
+    New params:
+      unsorted_subdivide: 'none' | 'type' | 'date' — for smart_name random catch-all subdivision.
     """
     filename = os.path.basename(filepath)
     target_root = os.path.abspath(dest_folder) if (dest_folder and str(dest_folder).strip()) else base_folder
@@ -720,7 +708,12 @@ def get_destination_folder(base_folder, filepath, sort_category, date_source='ct
         return os.path.join(target_root, ext_folder)
 
     elif sort_category in ('smart_name', 'name', 'full_name'):
-        folder_name, is_random, reason = get_name_sort_folder(filename, random_folder_name=random_folder_name)
+        folder_name, is_random, reason = get_name_sort_folder(
+            filename,
+            random_folder_name=random_folder_name,
+            filepath=filepath,
+            unsorted_subdivide=unsorted_subdivide
+        )
         return os.path.join(target_root, folder_name)
 
     elif sort_category == 'alphabetical':
@@ -1664,7 +1657,8 @@ def scan_directory_preview(
     isolate_duplicates=False,
     dest_folder=None,
     selected_files=None,
-    random_folder_name="Unsorted"
+    random_folder_name="_Random",
+    unsorted_subdivide='none'
 ):
     """
     Generates a full preview array of proposed file moves, stats, and duplicate analysis.
@@ -1698,6 +1692,11 @@ def scan_directory_preview(
 
     for fp in files:
         filename = os.path.basename(fp)
+        # Route zero-byte / unreadable files for review (flagged, not moved here — just marked)
+        try:
+            _file_size_bytes = os.path.getsize(fix_win_long_path(fp))
+        except Exception:
+            _file_size_bytes = -1
         cat = get_file_category(filename)
         category_counts[cat] = category_counts.get(cat, 0) + 1
 
@@ -1980,7 +1979,11 @@ def organize_directory(
     selected_files=None,
     skipped_handling='stay',
     skipped_dest_folder=None,
-    random_folder_name="Unsorted"
+    random_folder_name="_Random",
+    unsorted_subdivide='none',
+    iso_date_prefix=False,
+    route_corrupted=False,
+    corrupted_folder_name='Review_Corrupted'
 ):
     """
     Scans and organizes files safely. Supports selected_files list and smart_name matching.
@@ -2045,10 +2048,36 @@ def organize_directory(
                 continue
 
             is_dup = file_path in duplicates
-            target_dir = get_destination_folder(
-                base_folder, file_path, sort_category, date_source, structure_format, is_dup, isolate_duplicates, dest_folder=dest_folder, random_folder_name=random_folder_name
-            )
+
+            # Route zero-byte / corrupted files to Review_Corrupted folder (opt-in)
+            try:
+                _sz = os.path.getsize(safe_src)
+            except Exception:
+                _sz = -1
+            if route_corrupted and _sz == 0:
+                target_dir = os.path.join(
+                    os.path.abspath(dest_folder) if (dest_folder and str(dest_folder).strip()) else base_folder,
+                    corrupted_folder_name
+                )
+            else:
+                target_dir = get_destination_folder(
+                    base_folder, file_path, sort_category, date_source, structure_format,
+                    is_dup, isolate_duplicates, dest_folder=dest_folder,
+                    random_folder_name=random_folder_name, unsorted_subdivide=unsorted_subdivide
+                )
             filename = os.path.basename(file_path)
+
+            # ISO date prefix renaming (opt-in, smart_name mode)
+            if iso_date_prefix and sort_category in ('smart_name', 'name', 'full_name'):
+                try:
+                    date_obj = get_file_date(file_path, date_source)
+                    date_prefix = f"{date_obj.year:04d}-{date_obj.month:02d}-{date_obj.day:02d}_"
+                    stem, ext = os.path.splitext(filename)
+                    # Only add prefix if not already prefixed with an ISO date
+                    if not re.match(r'^\d{4}-\d{2}-\d{2}_', stem):
+                        filename = f"{date_prefix}{stem}{ext}"
+                except Exception:
+                    pass
 
             if os.path.abspath(os.path.dirname(file_path)) == os.path.abspath(target_dir):
                 stats['skipped'] += 1
@@ -2194,23 +2223,28 @@ def organize_by_name(
     folder,
     dest_folder=None,
     dry_run=True,
-    random_folder_name="Unsorted",
+    random_folder_name="_Random",
     mode='move',
     on_conflict='number',
     selected_files=None,
     recursive=True,
     exclude_folders=None,
     exclude_files=None,
-    progress_callback=None
+    progress_callback=None,
+    unsorted_subdivide='none',
+    iso_date_prefix=False,
+    route_corrupted=False,
+    corrupted_folder_name='Review_Corrupted'
 ):
     """
-    Dedicated high-performance Smart Name Sorter:
-      1. Exact full-name matching (minus extension) — no prefix truncation.
-         'ansh_true.jpg' -> 'ansh_true/' and 'ansh_rao.png' -> 'ansh_rao/'.
-      2. Heuristic random / machine-generated / hash detection.
-      3. All random files routed to ONE shared catch-all folder (e.g. 'Unsorted').
-      4. Preserves original casing for folder names.
-      5. Dry-run support by default, safe non-overwriting collision handling, and full audit logging.
+    Dedicated high-performance Smart Word-Based Sorter:
+      1. Extracts first meaningful alphabetical word (e.g. 'amazon', 'guru', 'invoice').
+      2. Creates ONE folder per unique word (e.g. 'amazon/', 'guru/').
+      3. All files without a meaningful word are routed to ONE shared catch-all folder (default: '_Random'),
+         optionally subdivided by file type ('type') or modification month ('date').
+      4. Optional ISO date prefix renaming: 'YYYY-MM-DD_filename.ext'.
+      5. Optional routing of zero-byte / corrupted files to 'Review_Corrupted/'.
+      6. Dry-run support by default, safe non-overwriting collision handling, and full audit logging.
     """
     return organize_directory(
         main_folder=folder,
@@ -2224,8 +2258,92 @@ def organize_by_name(
         on_conflict=on_conflict,
         selected_files=selected_files,
         random_folder_name=random_folder_name,
-        progress_callback=progress_callback
+        progress_callback=progress_callback,
+        unsorted_subdivide=unsorted_subdivide,
+        iso_date_prefix=iso_date_prefix,
+        route_corrupted=route_corrupted,
+        corrupted_folder_name=corrupted_folder_name
     )
+
+
+def generate_smart_name_plan(folder, random_folder_name="_Random", unsorted_subdivide='none',
+                             recursive=True, exclude_folders=None, exclude_files=None,
+                             route_corrupted=False, selected_files=None):
+    """
+    Step 5 of the File Sorting Super Prompt: generates a structured plan BEFORE execution.
+    Returns a dict with:
+      - 'proposed_folders': list of {name, file_count, sample_files} for Type A/C (meaningful) folders
+      - 'unsorted_count': total count of random/hash-named files going to Unsorted
+      - 'unsorted_breakdown': dict of sub-folder -> count (populated when unsorted_subdivide != 'none')
+      - 'review_needed': list of {path, reason} for files requiring manual review (zero-byte, no name)
+      - 'total_files': total files scanned
+    Does NOT modify the filesystem.
+    """
+    from collections import defaultdict
+
+    files = gather_files(
+        folder,
+        recursive=recursive,
+        exclude_folders=exclude_folders,
+        exclude_files=exclude_files,
+        selected_files=selected_files
+    )
+
+    proposed_folders = defaultdict(list)   # folder_name -> [filename, ...]
+    unsorted_breakdown = defaultdict(int)  # sub_folder -> count
+    review_needed = []                     # [{path, reason}]
+    unsorted_count = 0
+
+    for fp in files:
+        filename = os.path.basename(fp)
+        # Zero-byte / corrupted check
+        try:
+            sz = os.path.getsize(fix_win_long_path(fp))
+        except Exception:
+            sz = -1
+
+        if route_corrupted and sz == 0:
+            review_needed.append({'path': fp, 'reason': 'Zero-byte / corrupted file'})
+            continue
+
+        if not filename or not os.path.splitext(filename)[0].strip():
+            review_needed.append({'path': fp, 'reason': 'No usable filename (extension-only or empty)'})
+            continue
+
+        folder_name, is_random, reason = get_name_sort_folder(
+            filename,
+            random_folder_name=random_folder_name,
+            filepath=fp,
+            unsorted_subdivide=unsorted_subdivide
+        )
+
+        if is_random:
+            unsorted_count += 1
+            if unsorted_subdivide and unsorted_subdivide != 'none':
+                sub = get_unsorted_subfolder(fp, unsorted_subdivide)
+                unsorted_breakdown[sub] += 1
+            else:
+                unsorted_breakdown['(flat)'] += 1
+        else:
+            proposed_folders[folder_name].append(filename)
+
+    # Build sorted proposed folder list
+    proposed_list = [
+        {
+            'name': k,
+            'file_count': len(v),
+            'sample_files': v[:5]  # up to 5 sample names
+        }
+        for k, v in sorted(proposed_folders.items(), key=lambda x: x[0].lower())
+    ]
+
+    return {
+        'proposed_folders': proposed_list,
+        'unsorted_count': unsorted_count,
+        'unsorted_breakdown': dict(unsorted_breakdown),
+        'review_needed': review_needed,
+        'total_files': len(files)
+    }
 
 
 def list_manifest_files(main_folder=None):

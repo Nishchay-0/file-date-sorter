@@ -9,16 +9,17 @@ A powerful, modern desktop application and command-line utility for organizing, 
 
 ## 🌟 Features & Included Tools
 
-1. **⚡ Sorter & Organizer**: Automatically categorizes files into Year/Month (`2024/05`), File Type Category (`Images/JPG`), Extension (`PDF/PNG`), Alphabetical (`A-Z`), or File Size folders.
-2. **⚡ Subfolder Extractor**: Extract specific file types or all nested subfolder files into a flat directory structure.
-3. **🔍 SHA-256 Duplicate Finder & Isolator**: Detect exact content duplicates and isolate or trash them safely.
-4. **🪄 Magic File Converter & Format Fixer**: Reads binary magic byte headers (`FF D8 FF`, `OggS`, `ftyp`, etc.) to auto-detect true formats, fix missing/corrupted file extensions (`.DAT`, `.TMP`, `NO_EXT`), and batch convert audio (`3GA`, `OPUS`, `AMR` -> `MP3`), video (`VOB`, `3GP`, `MKV` -> `MP4`), and images (`WEBP`, `HEIC`, `BMP` -> `JPG/PNG`).
-5. **✏️ Smart Batch Renamer**: Rename hundreds of files simultaneously with pattern tags (`{OriginalName}`, `{YYYY}`, `{MM}`, `{Category}`, `{001}`) and case conversions (`camelCase`, `lowercase`, `UPPERCASE`).
-6. **🧹 Junk & OS Cleaner**: Detect 0-byte files, `.tmp`, `.log`, `.crdownload`, `desktop.ini`, `thumbs.db`.
-7. **📂 Standalone Empty Folder Cleaner**: Dedicated preview scanner and batch deletion tool for 0-file subfolders and OS junk directories across any folder hierarchy.
-8. **📊 Storage Analytics Dashboard**: Visual category size breakdowns, date range span, and top subfolder disk usage.
-9. **🚫 Unified Path Exclusion Engine**: Skip specific folders (`.git`, `node_modules`, `_Duplicates`), custom directories (picked via **"Except Folder..."**), file names, or extensions across all tools.
-10. **🛡️ System Vault Backup & 1-Click Undo**: Preview operations with Dry-Run mode, generate System Vault Zip backups, and restore any operation using 1-click undo manifests.
+1. **⚡ Sorter & Organizer**: Automatically categorizes files into Year/Month (`2024/05`), Word-Based Names (`amazon/`, `guru/`), File Type Category (`Images/JPG`), Extension (`PDF/PNG`), Alphabetical (`A-Z`), or File Size folders.
+2. **🎯 Word-Based Sorting & Single Random Catch-All**: Extracts the first meaningful alphabetical word base from each filename (e.g. `amazon_bill_123.pdf` -> `amazon/`, `guru_notes.txt` -> `guru/`). All files lacking a clean word (pure hashes, UUIDs, numeric IDs, or gibberish like `323f9w8ehf8awjefi`) route into **ONE SINGLE** shared folder called `_Random/` (or `Unsorted/`), preventing folder-per-hash directory pollution.
+3. **⚡ Subfolder Extractor**: Extract specific file types or all nested subfolder files into a flat directory structure.
+4. **🔍 SHA-256 Duplicate Finder & Isolator**: Detect exact content duplicates and isolate or trash them safely.
+5. **🪄 Magic File Converter & Format Fixer**: Reads binary magic byte headers (`FF D8 FF`, `OggS`, `ftyp`, etc.) to auto-detect true formats, fix missing/corrupted file extensions (`.DAT`, `.TMP`, `NO_EXT`), and batch convert audio (`3GA`, `OPUS`, `AMR` -> `MP3`), video (`VOB`, `3GP`, `MKV` -> `MP4`), and images (`WEBP`, `HEIC`, `BMP` -> `JPG/PNG`).
+6. **✏️ Smart Batch Renamer**: Rename hundreds of files simultaneously with pattern tags (`{OriginalName}`, `{YYYY}`, `{MM}`, `{Category}`, `{001}`) and case conversions (`camelCase`, `lowercase`, `UPPERCASE`).
+7. **🧹 Junk & OS Cleaner**: Detect 0-byte files, `.tmp`, `.log`, `.crdownload`, `desktop.ini`, `thumbs.db`.
+8. **📂 Standalone Empty Folder Cleaner**: Dedicated preview scanner and batch deletion tool for 0-file subfolders and OS junk directories across any folder hierarchy.
+9. **📊 Storage Analytics Dashboard**: Visual category size breakdowns, date range span, and top subfolder disk usage.
+10. **🚫 Unified Path Exclusion Engine**: Skip specific folders (`.git`, `node_modules`, `_Duplicates`), custom directories (picked via **"Except Folder..."**), file names, or extensions across all tools.
+11. **🛡️ System Vault Backup & 1-Click Undo**: Preview operations with Dry-Run mode, generate System Vault Zip backups, and restore any operation using 1-click undo manifests.
 
 ---
 
