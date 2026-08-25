@@ -471,121 +471,19 @@ def format_bytes(size):
 UUID_REGEX = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 HEX_HASH_REGEX = re.compile(r'^[0-9a-fA-F]{12,}$')
 META_CDN_REGEX = re.compile(r'^\d+_\d{10,}_\d{10,}_[a-zA-Z0-9]+$', re.IGNORECASE)
-CDN_MEDIA_SUFFIX_REGEX = re.compile(r'[_-](video_dashinit|transcode_output_dashinit|video_init|audio_dashinit|media_dashinit|dash_init)$', re.IGNORECASE)
-CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}')
+CDN_MEDIA_SUFFIX_REGEX = re.compile(r'[_-](video_dashinit|transcode_output_dashinit|transcode_oil_output_dashinit|video_init|audio_dashinit|media_dashinit|dash_init)$', re.IGNORECASE)
+CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{5,}')
 COMMON_HUMAN_WORD_ROOTS = {
     'image', 'photo', 'picture', 'screenshot', 'screen', 'video', 'vid',
     'doc', 'document', 'scan', 'recording', 'audio', 'track', 'song',
     'file', 'report', 'backup', 'copy', 'final', 'draft', 'test', 'data',
     'invoice', 'resume', 'note', 'notes', 'paper', 'project', 'presentation',
-    'movie', 'clip', 'music', 'sound', 'chapter', 'part', 'page', 'sample'
+    'movie', 'clip', 'music', 'sound', 'chapter', 'part', 'page', 'sample',
+    'vacation', 'trip', 'holiday', 'family', 'wedding', 'birthday', 'party',
+    'work', 'school', 'home', 'house', 'car', 'travel', 'summer', 'winter',
+    'spring', 'autumn', 'fall', 'january', 'february', 'march', 'april',
+    'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'
 }
-
-
-def is_random_or_hash_name(filename_or_basename):
-    """
-    Detects if a filename is machine-generated / random hash vs a human-named file.
-    Returns (is_random: bool, reason: str).
-
-    Heuristics:
-      1. UUID / GUID formats -> Random
-      2. Pure hexadecimal hashes (MD5, SHA1, SHA256) of length >= 12 -> Random
-      3. Meta / Facebook / Instagram CDN hash IDs (e.g. 0_103622762244864_4193263340616068702_n) -> Random
-      4. Multi-digit numeric ID sequences separated by underscores -> Random
-      5. Length >= 10 with NO separators ('_', '-', ' ', '.') and mixed letters+digits,
-         no dictionary words, and abnormal consonant clusters (>4 consonants) or high entropy -> Random
-      6. Structured names (with separators or recognizable human words) -> Human Named
-    """
-    if not filename_or_basename:
-        return False, "Empty filename"
-
-    # Strip compound extensions first (.zip.nomedia, .jpg.nomedia)
-    base_name = strip_all_extensions(filename_or_basename).strip() if 'strip_all_extensions' in globals() else os.path.splitext(os.path.basename(filename_or_basename))[0].strip()
-    if not base_name:
-        return False, "Empty base filename"
-
-    # 1. UUID Check
-    if UUID_REGEX.match(base_name):
-        return True, f"UUID machine-generated identifier ('{base_name}')"
-
-    # 2. Pure short numeric folder names (0, 1, 2, 05, 27, 28) - machine-generated sequence IDs
-    if base_name.isdigit():
-        return True, f"Short numeric machine ID ('{base_name}')"
-
-    # 2b. Separator-only or punctuation-only names like '_', '--', '__' - meaningless system artifacts
-    if re.match(r'^[\s_\-\.]+$', base_name):
-        return True, f"Separator/punctuation-only machine artifact ('{base_name}')"
-
-    # 3. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars)
-    if HEX_HASH_REGEX.match(base_name):
-        return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
-
-    # 4. Meta / Facebook / Instagram CDN Hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
-    if META_CDN_REGEX.match(base_name):
-        return True, f"Facebook/Instagram/Meta CDN machine hash ID ('{base_name}')"
-
-    # 5. Hex hash + streaming CDN media suffix (e.g. 3E4396DAE40C47DA_video_dashinit, 7B4E3C_transcode_output_dashinit)
-    cdn_stripped = CDN_MEDIA_SUFFIX_REGEX.sub('', base_name)
-    if cdn_stripped != base_name and HEX_HASH_REGEX.match(cdn_stripped):
-        return True, f"Hex hash + CDN media stream suffix ('{base_name}')"
-
-    # 6. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702)
-    clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
-    if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
-        return True, f"Numeric machine ID sequence ({len(clean_no_sep)} digits) ('{base_name}')"
-
-    # 7. Separator Check: Names with '_', '-', ' ', '.' usually indicate human structured naming
-    has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
-
-    if has_separator:
-        return False, f"Structured human name with separators ('{base_name}')"
-
-    # 4. Length check: random strings are typically >= 10 chars without separators
-    name_len = len(base_name)
-    if name_len < 10:
-        return False, f"Short name (<10 chars) ('{base_name}')"
-
-    # Check for presence of common human word roots
-    base_lower = base_name.lower()
-    for root in COMMON_HUMAN_WORD_ROOTS:
-        if root in base_lower:
-            return False, f"Contains human word root '{root}' ('{base_name}')"
-
-    # Check if purely alphabetic human-like word vs mixed alphanumeric
-    has_digits = any(c.isdigit() for c in base_name)
-    has_letters = any(c.isalpha() for c in base_name)
-
-    # 5. Mixed alphanumeric without separators
-    if has_digits and has_letters:
-        vowels = set('aeiouAEIOU')
-        vowel_count = sum(1 for c in base_name if c in vowels)
-        vowel_ratio = vowel_count / float(name_len)
-        consonant_cluster = CONSONANT_CLUSTER_REGEX.search(base_name)
-
-        char_counts = {}
-        for c in base_name:
-            char_counts[c] = char_counts.get(c, 0) + 1
-        entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
-
-        if consonant_cluster:
-            cluster_text = consonant_cluster.group(0)
-            return True, f"Random machine-generated name: {name_len} chars, mixed alphanumeric, consonant cluster '{cluster_text}' (entropy: {entropy:.2f})"
-
-        if vowel_ratio < 0.18 or vowel_ratio > 0.80 or entropy > 2.9:
-            return True, f"Random machine-generated name: {name_len} chars, mixed alphanumeric with abnormal vowel ratio {vowel_ratio:.1%} (entropy: {entropy:.2f})"
-
-    # 6. High entropy string of length >= 12 with consonant cluster
-    if name_len >= 12:
-        char_counts = {}
-        for c in base_name:
-            char_counts[c] = char_counts.get(c, 0) + 1
-        entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
-
-        consonant_cluster = CONSONANT_CLUSTER_REGEX.search(base_name)
-        if consonant_cluster and entropy > 2.8:
-            return True, f"Random string: {name_len} chars, high entropy {entropy:.2f}, consonant cluster '{consonant_cluster.group(0)}'"
-
-    return False, f"Regular human name ('{base_name}')"
 
 
 def strip_all_extensions(filename_or_basename):
@@ -604,79 +502,150 @@ def strip_all_extensions(filename_or_basename):
     return name
 
 
+def is_random_or_hash_name(filename_or_basename):
+    """
+    Detects if a filename is clearly machine-generated / random hash vs a human-named file.
+    Returns (is_random: bool, reason: str).
+
+    Conservative Policy:
+      - Deterministic machine identifiers (UUID, MD5/SHA hashes >= 12 chars, Meta CDN IDs, pure numeric IDs) -> Random (Unsorted)
+      - Human names, alphanumeric names (Nishchay2405, invoice2026final), names with separators -> Human Named
+      - If uncertain -> Human Named (default to PRESERVE)
+    """
+    if not filename_or_basename:
+        return False, "Empty filename"
+
+    base_name = strip_all_extensions(filename_or_basename).strip()
+    if not base_name:
+        return False, "Empty base filename"
+
+    # 1. UUID Check
+    if UUID_REGEX.match(base_name):
+        return True, f"UUID machine-generated identifier ('{base_name}')"
+
+    # 2. Pure short numeric folder names (0, 1, 2, 05, 27, 28) - machine-generated sequence IDs
+    if base_name.isdigit():
+        return True, f"Short numeric machine ID ('{base_name}')"
+
+    # 2b. Separator-only or punctuation-only names like '_', '--', '__' - meaningless system artifacts
+    if re.match(r'^[\s_\-\.]+$', base_name):
+        return True, f"Separator/punctuation-only machine artifact ('{base_name}')"
+
+    # 3. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars with at least one hex letter)
+    if HEX_HASH_REGEX.match(base_name) and any(c.lower() in 'abcdef' for c in base_name):
+        return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
+
+    # 4. Meta / Facebook / Instagram CDN Hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
+    if META_CDN_REGEX.match(base_name):
+        return True, f"Facebook/Instagram/Meta CDN machine hash ID ('{base_name}')"
+
+    # 5. Hex hash + streaming CDN media suffix (e.g. 3E4396DAE40C47DA_video_dashinit, 7B4E3C_transcode_output_dashinit)
+    cdn_stripped = CDN_MEDIA_SUFFIX_REGEX.sub('', base_name)
+    if cdn_stripped != base_name and HEX_HASH_REGEX.match(cdn_stripped):
+        return True, f"Hex hash + CDN media stream suffix ('{base_name}')"
+
+    # 6. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702 >= 12 digits)
+    clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
+    if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
+        return True, f"Numeric machine ID sequence ({len(clean_no_sep)} digits) ('{base_name}')"
+
+    # 7. Separator Check: Names with '_', '-', ' ', '.' indicate human structured naming
+    has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
+    if has_separator:
+        return False, f"Structured human name with separators ('{base_name}')"
+
+    name_len = len(base_name)
+    if name_len < 10:
+        return False, f"Short human name (<10 chars) ('{base_name}')"
+
+    # Check for presence of common human word roots
+    base_lower = base_name.lower()
+    for root in COMMON_HUMAN_WORD_ROOTS:
+        if root in base_lower:
+            return False, f"Contains human word root '{root}' ('{base_name}')"
+
+    # Check CamelCase / TitleCase word boundaries (e.g. Project2026Report, Vacation2024Photos, Nishchay2405)
+    has_uppercase = any(c.isupper() for c in base_name)
+    has_lowercase = any(c.islower() for c in base_name)
+    if has_uppercase and has_lowercase:
+        camel_words = re.findall(r'[A-Z][a-z]+|\d+', base_name)
+        if len(camel_words) >= 2 or (len(camel_words) == 1 and any(c.isdigit() for c in base_name)):
+            return False, f"CamelCase/TitleCase human structured name ('{base_name}')"
+
+    # Pure alphabetic words with normal vowel ratio -> Human word
+    has_digits = any(c.isdigit() for c in base_name)
+    has_letters = any(c.isalpha() for c in base_name)
+    vowels = set('aeiouAEIOU')
+    vowel_count = sum(1 for c in base_name if c in vowels)
+    vowel_ratio = vowel_count / float(name_len)
+
+    if not has_digits and has_letters and 0.20 <= vowel_ratio <= 0.70:
+        return False, f"Alphabetic human word ('{base_name}')"
+
+    # High entropy unstructured random alphanumeric strings without dictionary roots
+    char_counts = {}
+    for c in base_name:
+        char_counts[c] = char_counts.get(c, 0) + 1
+    entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
+
+    if name_len >= 16 and entropy > 3.0:
+        return True, f"Random high-entropy alphanumeric string ({name_len} chars, entropy {entropy:.2f}) ('{base_name}')"
+
+    return False, f"Regular human name ('{base_name}')"
+
+
 def extract_clean_title_prefix(filename_or_basename):
     """
-    Extracts the core topic / brand / title name of a file by stripping:
+    Extracts the core topic / brand / title name of a file by stripping ONLY:
       1. Compound file extensions (e.g. '.zip.nomedia', '.jpg.nomedia', '.tar.gz').
-      2. Copy/duplicate suffixes (e.g. ' (1)', ' - Copy').
-      3. Leading dates/timestamps (e.g. '2022-02-25_', '20240101_123456_').
-      4. Generic export prefixes (e.g. 'media~', 'export~', 'backup~').
-      5. Trailing date/timestamp/ID/numeric/counter suffixes (e.g. '-1499352345', '_20230809_190350_257').
+      2. Duplicate/copy suffixes (e.g. ' (1)', ' (2)', ' - Copy', '_copy').
+      3. Recognized platform export patterns (e.g. 'Snapchat-235837277' -> 'Snapchat',
+         '2022-02-25_media~Snapchat-1499352345' -> 'Snapchat').
+      4. Recognized structured camera/video timestamp patterns (e.g.
+         'ANSHI-VID_20230809_190350_257' -> 'ANSHI-VID',
+         'VID_101211201_003350' -> 'VID').
 
-    Examples:
-      - 'Snapchat-235837277.zip.nomedia'           -> 'Snapchat'
-      - '2022-02-25_media~Snapchat-1499352345.jpg' -> 'Snapchat'
-      - '2022-05-12_media~Snapchat-1104223881.mp4' -> 'Snapchat'
-      - 'ANSHI-VID_20230809_190350_257.mp4'       -> 'ANSHI-VID'
-      - 'VID_101211201_003350.mp4'                -> 'VID'
-      - 'ansh_true.jpg'                           -> 'ansh_true'
-      - 'ansh_rao.png'                            -> 'ansh_rao'
+    IMPORTANT: Legitimate human numeric suffixes (e.g. 'invoice-1042', 'report-2026',
+    'project-42', 'Nishchay-2405', 'Vacation-2026') MUST be preserved completely.
     """
     if not filename_or_basename:
         return ""
     
-    # 0. Strip all compound extensions (.zip.nomedia, .jpg, etc.)
+    # 0. Strip compound extensions (.zip.nomedia, .jpg, etc.)
     base_name = strip_all_extensions(filename_or_basename).strip()
     if not base_name:
         return ""
 
-    # 1. Strip copy/duplicate suffixes: ' (1)', ' - Copy', '_copy', etc.
-    name = re.sub(r'(\s*\(\d+\)|\s*[-_]\s*copy.*)$', '', base_name, flags=re.IGNORECASE).strip('_- ')
+    # 1. Recognized Platform Export (Snapchat, Instagram, Takeout, etc.)
+    # e.g. 2022-02-25_media~Snapchat-1499352345, Snapchat-236253845
+    plat_match = re.search(r'(?:^|[\d_\.\-~])(Snapchat|Instagram|TikTok|Facebook|Twitter|WhatsApp|Takeout)[~_\-]', base_name, re.IGNORECASE)
+    if plat_match:
+        plat_name = plat_match.group(1).capitalize()
+        if plat_name.lower() == 'whatsapp': plat_name = 'WhatsApp'
+        elif plat_name.lower() == 'tiktok': plat_name = 'TikTok'
+        elif plat_name.lower() == 'snapchat': plat_name = 'Snapchat'
+        return plat_name
 
-    # 2. Strip leading dates (YYYY-MM-DD_, YYYY.MM.DD_, YYYYMMDD_, YYYYMMDD_HHMMSS_)
-    name = re.sub(r'^\d{4}[-._]\d{2}[-._]\d{2}[_.-]?', '', name)
-    name = re.sub(r'^\d{8}[_.-]\d{6}[_.-]?', '', name)
-    name = re.sub(r'^\d{8}[_.-]?', '', name)
+    # 2. Recognized Structured Camera / Video Pattern
+    # e.g. ANSHI-VID_20230809_190350_257, VID_20230308_214221, VID_101211201_003350, IMG_20230101_120000
+    cam_match = re.match(r'^([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*?)[_-](\d{4,}[_-]\d{4,}(?:[_-]\d+)*|\d{8,}[_-]\d{6,}|\d{8,})$', base_name)
+    if cam_match:
+        return cam_match.group(1)
 
-    # 3. Strip generic wrapper prefixes like 'media~', 'export~', 'backup~', 'file~'
-    name = re.sub(r'^(media|export|backup|takeout|file)[~_-]', '', name, flags=re.IGNORECASE).strip('_- ')
+    # 3. Strip ONLY recognized duplicate / copy suffixes: ' (1)', ' (2)', ' - Copy', '_copy', etc.
+    clean_title = re.sub(r'(\s*\(\d+\)|\s*[-_]\s*copy.*|\s*[-_]\s*copy)$', '', base_name, flags=re.IGNORECASE).strip('_- ')
+    if clean_title:
+        return clean_title
 
-    def is_suffix_token(token):
-        tok = token.strip()
-        if not tok:
-            return True
-        if tok.isdigit():
-            return True
-        if tok.lower() in ('n', 'o', 's', 'b', 'q', 'a', 'c', 'tmp', 'bak', 'nomedia'):
-            return True
-        if re.match(r'^\d{4}[-._]\d{2}[-._]\d{2}$', tok):
-            return True
-        if re.match(r'^v\d+$', tok, re.IGNORECASE):
-            return True
-        if re.match(r'^(WA|IMG|VID|AUD)\d+$', tok, re.IGNORECASE):
-            return True
-        return False
-
-    for sep in ('~', '_', '-'):
-        if sep in name:
-            parts = name.split(sep)
-            keep_idx = len(parts)
-            while keep_idx > 1 and is_suffix_token(parts[keep_idx - 1]):
-                keep_idx -= 1
-            if keep_idx < len(parts):
-                prefix = sep.join(parts[:keep_idx]).strip('_-~ ')
-                if prefix:
-                    name = prefix
-                    break
-
-    return name if name else base_name
+    # 4. Default: Preserve the complete filename stem (e.g. invoice-1042, report-2026, project-42, Nishchay-2405)
+    return base_name
 
 
 def get_name_sort_folder(filename, random_folder_name="Unsorted"):
     """
     Computes destination subfolder for Smart Full-Name Matching mode:
       - If filename is flagged as machine-generated/hash-like: routes to single catch-all folder (e.g. 'Unsorted').
-      - Otherwise: strips date/timestamp/sequence suffixes to group related files (e.g. 'ANSHI-VID_...' -> 'ANSHI-VID/').
+      - Otherwise: strips copy suffixes or camera/export prefixes to group related files (e.g. 'ANSHI-VID_...' -> 'ANSHI-VID/').
     Returns (folder_name: str, is_random: bool, reason: str).
     """
     is_random, reason = is_random_or_hash_name(filename)

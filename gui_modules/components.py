@@ -29,8 +29,11 @@ GRANULAR_FILE_TYPES = {
 try:
     import customtkinter as ctk
     HAS_CUSTOMTKINTER = True
+    _BaseToplevel = ctk.CTkToplevel
 except ImportError:
+    ctk = None
     HAS_CUSTOMTKINTER = False
+    _BaseToplevel = tk.Toplevel
 
 try:
     from PIL import Image
@@ -149,8 +152,10 @@ def create_info_icon(parent, tooltip_text, fg_color=("#e0e0e0", "#333333")):
     return btn
 
 
-class Windows11ConflictDialog(ctk.CTkToplevel):
+class Windows11ConflictDialog(_BaseToplevel):
     def __init__(self, parent, src_path, dst_path, thumbnail_loader_func=None):
+        if not HAS_CUSTOMTKINTER:
+            raise RuntimeError("CustomTkinter is required for Windows11ConflictDialog. Install customtkinter with: pip install customtkinter")
         super().__init__(parent)
 
         self.src_path = src_path
