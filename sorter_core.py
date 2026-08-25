@@ -471,6 +471,7 @@ def format_bytes(size):
 UUID_REGEX = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 HEX_HASH_REGEX = re.compile(r'^[0-9a-fA-F]{12,}$')
 META_CDN_REGEX = re.compile(r'^\d+_\d{10,}_\d{10,}_[a-zA-Z0-9]+$', re.IGNORECASE)
+CDN_MEDIA_SUFFIX_REGEX = re.compile(r'[_-](video_dashinit|transcode_output_dashinit|video_init|audio_dashinit|media_dashinit|dash_init)$', re.IGNORECASE)
 CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}')
 COMMON_HUMAN_WORD_ROOTS = {
     'image', 'photo', 'picture', 'screenshot', 'screen', 'video', 'vid',
@@ -507,20 +508,29 @@ def is_random_or_hash_name(filename_or_basename):
     if UUID_REGEX.match(base_name):
         return True, f"UUID machine-generated identifier ('{base_name}')"
 
-    # 2. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars)
+    # 2. Pure short numeric folder names (0, 1, 2, 05, 27, 28) - machine-generated sequence IDs
+    if base_name.isdigit():
+        return True, f"Short numeric machine ID ('{base_name}')"
+
+    # 3. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars)
     if HEX_HASH_REGEX.match(base_name):
         return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
 
-    # 3. Meta / Facebook / Instagram CDN Hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
+    # 4. Meta / Facebook / Instagram CDN Hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
     if META_CDN_REGEX.match(base_name):
         return True, f"Facebook/Instagram/Meta CDN machine hash ID ('{base_name}')"
 
-    # 4. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702)
+    # 5. Hex hash + streaming CDN media suffix (e.g. 3E4396DAE40C47DA_video_dashinit, 7B4E3C_transcode_output_dashinit)
+    cdn_stripped = CDN_MEDIA_SUFFIX_REGEX.sub('', base_name)
+    if cdn_stripped != base_name and HEX_HASH_REGEX.match(cdn_stripped):
+        return True, f"Hex hash + CDN media stream suffix ('{base_name}')"
+
+    # 6. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702)
     clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
     if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
         return True, f"Numeric machine ID sequence ({len(clean_no_sep)} digits) ('{base_name}')"
 
-    # 5. Separator Check: Names with '_', '-', ' ', '.' usually indicate human structured naming
+    # 7. Separator Check: Names with '_', '-', ' ', '.' usually indicate human structured naming
     has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
 
     if has_separator:
