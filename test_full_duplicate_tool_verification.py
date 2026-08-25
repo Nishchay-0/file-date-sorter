@@ -110,5 +110,25 @@ def run_full_duplicate_verification():
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
+def test_default_exclusions_skip_protected_dirs(tmp_path):
+    root = tmp_path / "workspace"
+    (root / ".git").mkdir(parents=True)
+    (root / "node_modules").mkdir(parents=True)
+    (root / "_Duplicates").mkdir(parents=True)
+    (root / "safe").mkdir(parents=True)
+
+    (root / ".git" / "config").write_text("secret", encoding="utf-8")
+    (root / "node_modules" / "dep.js").write_text("secret", encoding="utf-8")
+    (root / "_Duplicates" / "dup.txt").write_text("secret", encoding="utf-8")
+    (root / "safe" / "keep.txt").write_text("ok", encoding="utf-8")
+
+    found = gather_files(str(root), recursive=True)
+
+    assert str(root / "safe" / "keep.txt") in found
+    assert not any(".git" in p for p in found)
+    assert not any("node_modules" in p for p in found)
+    assert not any("_Duplicates" in p for p in found)
+
+
 if __name__ == "__main__":
     run_full_duplicate_verification()

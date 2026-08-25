@@ -33,6 +33,8 @@ models/
 
 # Build artifacts & tool configs
 .specify/
+.continue/
+
 
 # Secrets & Credentials (NEVER commit)
 .env

@@ -99,7 +99,22 @@ class TestPeopleSorterEngine(unittest.TestCase):
         res2 = self.engine.scan_directory(self.test_dir)
         self.assertEqual(res1['total_files'], res2['total_files'])
 
-    def test_05_opt_in_shortcut_generation(self):
+    def test_05_cache_key_changes_when_file_contents_change(self):
+        img_path = self._create_synthetic_face_image("cache_change.jpg")
+        original_size = os.path.getsize(img_path)
+        target_mtime = 1700000000.0
+        os.utime(img_path, (target_mtime, target_mtime))
+
+        key_before = self.engine._cache_key_for_file(img_path)
+
+        with open(img_path, 'wb') as fh:
+            fh.write(b'X' * original_size)
+        os.utime(img_path, (target_mtime, target_mtime))
+
+        key_after = self.engine._cache_key_for_file(img_path)
+        self.assertNotEqual(key_before, key_after, "Cache key should change when file contents change even if size and mtime stay fixed")
+
+    def test_06_opt_in_shortcut_generation(self):
         img_path = self._create_synthetic_face_image("shortcut_photo.jpg")
         res = self.engine.scan_directory(self.test_dir)
         shortcuts_res = self.engine.create_people_shortcuts(self.test_dir)

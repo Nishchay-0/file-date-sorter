@@ -50,6 +50,7 @@ from hashing import get_file_hash, fix_win_long_path, is_cloud_placeholder
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.heic', '.tiff', '.raw'}
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.mov', '.avi', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.vob', '.mpg', '.mpeg'}
+CACHE_SCHEMA_VERSION = 2
 
 
 def crop_to_b64(crop_bgr, target_size=(90, 90)):
@@ -89,6 +90,24 @@ class FaceSorterEngine:
                 json.dump(data, f, indent=2)
         except Exception:
             pass
+
+    def _cache_key_for_file(self, filepath):
+        """Build a versioned, content-aware cache key for face embeddings.
+
+        The previous implementation keyed cache entries by path + size + mtime only,
+        which could return stale results if a file was rewritten without changing
+        those metadata values. Adding a SHA-256 fingerprint and schema version makes
+        the cache self-invalidating when contents change while preserving fast hits.
+        """
+        safe_fp = fix_win_long_path(filepath)
+        try:
+            stat = os.stat(safe_fp)
+            size = stat.st_size
+            mtime = getattr(stat, 'st_mtime_ns', stat.st_mtime)
+            file_hash = get_file_hash(safe_fp) or "unknown"
+            return f"{safe_fp}|{size}|{mtime}|{file_hash}|v{CACHE_SCHEMA_VERSION}"
+        except Exception:
+            return f"{safe_fp}|unknown|v{CACHE_SCHEMA_VERSION}"
 
     def _init_models(self):
         """Initializes OpenCV YuNet/SFace models and ONNX Runtime session if available."""
@@ -400,15 +419,7 @@ class FaceSorterEngine:
             if progress_callback:
                 progress_callback(idx + 1, total_files, os.path.basename(fp))
 
-            try:
-                stat = os.stat(fp)
-                mtime = stat.st_mtime
-                size = stat.st_size
-            except Exception:
-                mtime = 0
-                size = 0
-
-            cache_key = f"{fp}_{size}_{mtime}"
+            cache_key = self._cache_key_for_file(fp)
 
             if cache_key in self.cache:
                 cached_faces = self.cache[cache_key]

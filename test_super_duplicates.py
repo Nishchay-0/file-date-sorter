@@ -20,6 +20,30 @@ from sorter_core import (
 )
 
 
+def test_selected_files_bypass_extension_filters():
+    temp_dir = tempfile.mkdtemp(prefix="selected_dup_")
+    try:
+        f1 = os.path.join(temp_dir, "alpha.txt")
+        f2 = os.path.join(temp_dir, "beta.txt")
+        with open(f1, "w", encoding="utf-8") as f:
+            f.write("same-content")
+        with open(f2, "w", encoding="utf-8") as f:
+            f.write("same-content")
+
+        groups = find_duplicate_groups(
+            temp_dir,
+            match_mode='content',
+            recursive=True,
+            selected_files=[f1, f2],
+            include_exts=['.jpg'],
+        )
+
+        assert len(groups) == 1, f"Expected selected files to bypass extension filters, got {groups}"
+        assert {item['filename'] for item in groups[0]['files']} == {'alpha.txt', 'beta.txt'}
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 def run_super_duplicate_tests():
     test_dir = os.path.abspath("test_super_duplicates_temp")
     if os.path.exists(test_dir):

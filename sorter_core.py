@@ -694,7 +694,7 @@ def gather_files(main_folder, recursive=True, include_exts=None, exclude_exts=No
     exc_files_set = set(f.lower().strip() for f in exclude_files) if exclude_files else set()
 
     # Combine user exclude_folders and exclude_files with default internal exclusions
-    all_exc_folders = []
+    all_exc_folders = list(DEFAULT_EXCLUDED_FOLDERS)
     if exclude_folders:
         if isinstance(exclude_folders, (list, tuple, set)):
             all_exc_folders.extend(list(exclude_folders))
@@ -705,9 +705,10 @@ def gather_files(main_folder, recursive=True, include_exts=None, exclude_exts=No
             all_exc_folders.extend(list(exclude_files))
         elif isinstance(exclude_files, str):
             all_exc_folders.extend([p.strip() for p in exclude_files.replace(',', ';').split(';') if p.strip()])
-    all_exc_folders.extend([".backups", ".trash_duplicates"])
 
-    # If explicit individual files were selected by user!
+    # If explicit individual files were selected by user, honor the user's exact choice.
+    # General folder/category extension filters should not silently remove files that were
+    # deliberately picked by the user from a file dialog.
     if selected_files:
         files_to_process = []
         for fp in selected_files:
@@ -717,11 +718,6 @@ def gather_files(main_folder, recursive=True, include_exts=None, exclude_exts=No
             if is_manifest_file(fname) or (exc_files_set and fname.lower().strip() in exc_files_set):
                 continue
             if is_path_excluded(fp, all_exc_folders, base_folder=main_folder):
-                continue
-            ext = os.path.splitext(fname)[1].lower()
-            if exc_ext_set and ext in exc_ext_set:
-                continue
-            if inc_ext_set and ext not in inc_ext_set:
                 continue
             files_to_process.append(fp)
         return files_to_process
@@ -799,6 +795,12 @@ def gather_files(main_folder, recursive=True, include_exts=None, exclude_exts=No
 
 
 VIDEO_FILE_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.vob', '.ts', '.m2ts', '.divx', '.mpg', '.mpeg'}
+DEFAULT_EXCLUDED_FOLDERS = [
+    '.git', 'node_modules', '_Duplicates', '.backups', '.trash_duplicates',
+    'System Volume Information', '$RECYCLE.BIN', '__pycache__', '.venv', 'venv',
+    '.idea', '.vscode', 'tmp', 'temp'
+]
+
 
 def get_video_file_info(file_path):
     """
@@ -908,7 +910,7 @@ def find_duplicates(
     if not files:
         return []
 
-    if include_exts is not None:
+    if include_exts is not None and not selected_files:
         known_cat_exts = {
             '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.tiff', '.tif', '.heic', '.heif', '.raw', '.cr2', '.nef', '.svg', '.ico', '.psd',
             '.pdf', '.doc', '.docx', '.txt', '.xlsx', '.xls', '.csv', '.pptx', '.ppt', '.rtf', '.odt', '.ods', '.odp', '.epub', '.md', '.log', '.xml', '.json',
@@ -1544,7 +1546,13 @@ def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders
     if not os.path.isdir(fix_win_long_path(folder)):
         return 0
 
-    if is_path_excluded(folder, exclude_folders, base_folder=folder):
+    merged_excludes = list(DEFAULT_EXCLUDED_FOLDERS)
+    if exclude_folders:
+        if isinstance(exclude_folders, (list, tuple, set)):
+            merged_excludes.extend(list(exclude_folders))
+        elif isinstance(exclude_folders, str):
+            merged_excludes.extend([p.strip() for p in exclude_folders.replace(',', ';').split(';') if p.strip()])
+    if is_path_excluded(folder, merged_excludes, base_folder=folder):
         return 0
 
     OS_JUNK_FILES = {'desktop.ini', 'thumbs.db', '.ds_store', '.bridgeortcache', '.bridgeortcachet'}

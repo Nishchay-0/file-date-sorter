@@ -7,7 +7,7 @@
 **CONSTRAINT-001: No Silent Destruction**
 - Every destructive operation (delete, overwrite, rename, move) must:
   1. Show preview (exact list of affected files)
-  2. Generate System Vault backup (zip + manifest)
+  2. Generate System Vault backup (zip + `.undo_manifest.json`)
   3. Require explicit confirmation (checkbox + button)
   4. Support undo via 1-click restore
 - **Scope:** All tools (Sorter, Duplicates, Converter, Renamer, Cleaner)
@@ -23,20 +23,19 @@
   3. Easy opt-out (persist choice in config)
 - **Scope:** Entire application + all dependencies
 - **Audit:** Code review for `import requests`, `urllib`, `analytics`, `telemetry`, `crash_reporter` patterns
-- **Evidence:** Static analysis + network sniffing (Wireshark) on first run
-- **Status:** ✅ Verified — no external calls found in core code (2026-08-18)
+- **Evidence:** Static analysis + network sniffing on first run
+- **Status:** ✅ Verified — no external telemetry calls in core code
 
 ---
 
 **CONSTRAINT-003: Cache Invalidation Strategy**
 - Face detection results (`.people_cache.json`) must invalidate when:
-  - Source image file modified (mtime changed)
+  - Source image file modified (mtime or content hash changed)
   - Face model version changed (model file mtime or embedded version)
   - Cache format version changed (schema bump)
-- **Current:** mtime-based only (insufficient) — see CACHE-001 in known-issues.md
-- **Next:** Implement content-hash or version-tagged format
-- **Scope:** `face_engine.py`, `face_sort.py`, cache loading/saving
-- **Test:** `test_people_clustering_tune.py` — verify cache hit/miss on image edit
+- **Current:** Content-aware hash + schema version tag implemented in `face_sort.py`
+- **Scope:** `face_sort.py`, cache loading/saving
+- **Test:** `test_people_sorter.py` — `test_05_cache_key_changes_when_file_contents_change` (PASSED)
 
 ---
 
@@ -48,8 +47,6 @@
   - Insufficient disk space → show error + required space, not partial write
   - Permission denied → show which folder + suggest admin mode, not skip silently
 - **Scope:** All tools, especially Sorter and Converter (write-heavy)
-- **Violation Example:** ❌ File write fails → skip to next file without user notice
-- **Correct Example:** ✅ File write fails → show error dialog with retry/skip/abort options
 - **Evidence:** Error paths in `sorter_core.py`, exception handlers
 
 ---
@@ -60,7 +57,6 @@
   2. Cancel button (non-blocking; must preserve completed work if cache exists)
   3. Time remaining estimate (optional; accuracy not required)
 - **Scope:** Duplicate scanning, face detection, bulk conversions, hashing
-- **Test:** `test_watcher_debounce.py`, manual test on 100k+ files
 - **Evidence:** Progress bar implementation in `gui_modules/views/tab_duplicates.py`, `tab_people.py`
 
 ---
@@ -71,109 +67,65 @@
   - No approximations ("~100 files") — exact lists
   - If actual execution differs from preview, treat as bug (CONSTRAINT-001 violation)
 - **Scope:** All 10 tools
-- **Test:** Create paired tests (dry-run vs. actual) for each tool; assert identical results
-- **Evidence:** `test_full_duplicate_tool_verification.py`, test_sorter.py
+- **Evidence:** `test_full_duplicate_tool_verification.py`, `test_super_duplicates.py`
 
 ---
 
-### 🔧 Platform & Dependencies
+### 🔧 Platform & Workflow
 
 **CONSTRAINT-007: Windows-First, Cross-Platform Secondary**
 - Primary development/testing target: Windows 10/11
-- Cross-platform (macOS, Linux) support is lower priority; breakage on other OS acceptable if Windows works
-- Build artifacts (installer, .exe) Windows-only
+- Cross-platform support is secondary; breakage on other OS is acceptable if Windows works flawlessly
+- Build artifacts (installer, .exe) Windows-focused with `fix_win_long_path()` prefix support (`\\?\`)
 - **Scope:** CI/CD, GUI theming, file path handling, packaging
-- **Exception:** Python standard library code must be platform-agnostic where trivial
 
 ---
 
 **CONSTRAINT-008: No Heavy ML/Inference Framework Runtime Dependency**
-- Face detection uses ONNX Runtime (lightweight, ~20 MB)
+- Face detection uses ONNX Runtime / OpenCV (lightweight footprint)
 - No TensorFlow, PyTorch, Transformers, etc. bundled (excessive bloat)
-- Models downloaded on-demand (lazy load, not bundled)
-- **Scope:** `face_engine.py`, model loading
-- **Rationale:** Installer must stay under 200 MB; ONNX achieves this
-- **Evidence:** `build_exe.py` spec file; PyInstaller bundle size check
+- Models downloaded on-demand (lazy load, not bundled in git repository)
+- **Scope:** `face_sort.py`, model loading
 
 ---
 
 **CONSTRAINT-009: Code Signing & SmartScreen Warning Removal**
-- Distributed executable (.exe, installer) must be code-signed with EV or OV certificate
-- Signing must be automatic if environment variables set:
+- Distributed executable (.exe, installer) must be code-signed when cert environment variables are set:
   - `CODE_SIGNING_CERT_PATH` (path to .pfx file)
   - `CODE_SIGNING_CERT_PASS` (certificate password)
 - **Scope:** `build_exe.py` (code-signing hook), CI workflow
-- **Rationale:** Prevent Windows SmartScreen "Unrecognized Publisher" warning
-- **Evidence:** `build_exe.py` has `sign_executable()` function; CI workflow sets env vars
+
+---
+
+**CONSTRAINT-010: Always Commit and Push to GitHub on Task Completion**
+- At the conclusion of every task or work session:
+  1. Run the test suite and verify changes pass cleanly
+  2. Scan git diffs to ensure no API keys, credentials, or secrets are staged
+  3. Commit changes with clean semantic commit messages
+  4. Push directly to remote repository (`origin/main`)
+- **Scope:** All agent workflows and pair programming sessions
+- **Evidence:** Git log and remote branch tracking (`git push origin main`)
 
 ---
 
 ## Settled Technical Decisions
 
 ### Architecture
-
-| Decision | Alternative(s) Rejected | Why | Owner | Date |
-|----------|-------------------------|-----|-------|------|
-| PyQt5 for GUI | Tkinter, PySimpleGUI, web-based (Electron) | Tkinter: outdated look; PySimpleGUI: limited styling; Electron: bloated (~200 MB); PyQt5: native look, mature, ~30 MB footprint | — | Pre-1.0 |
-| ONNX for face models | TensorFlow, PyTorch | ONNX: inference-only (smaller); TF/PT: full framework (100+ MB overhead) | — | Pre-1.0 |
-| Watchdog for file monitoring | Manual polling, OS-specific APIs | Watchdog: cross-platform, mature; polling: CPU waste; OS APIs: fragmentation | — | Pre-1.0 |
-| JSON for settings storage | SQLite, YAML, INI | JSON: human-readable, no extra deps; SQLite: overkill; YAML: dependency; INI: limited types | — | Pre-1.0 |
-
-### Data & Caching
-
-| Decision | Why | Status | Test |
-|----------|-----|--------|------|
-| mtime-based cache invalidation | Simple, fast; covers most cases | 🟡 INSUFFICIENT — needs version tag | CACHE-001 in known-issues |
-| SHA-256 for duplicate detection | Collision probability negligible (~1e-77 for 2^64 files); no false positives in practice | ✅ LOCKED | test_sorter.py |
-| System Vault as folder + manifest file (not database) | Human-readable recovery; no dependency on DB library | ✅ LOCKED | Manual undo tests |
-
-### UI/UX
-
-| Decision | Why | Status |
-|----------|-----|--------|
-| Tabbed interface (10 tools in one app) | Single-window UX; tool switching without app overhead | ✅ LOCKED |
-| Right-click context menus for folders/files | Familiar; reduces toolbar clutter | ✅ LOCKED |
-| Dry-run checkbox (not separate mode) | Single UI path; easier to discover | ✅ LOCKED |
-| Atomic checkbox repaint engine (scrollable frames) | Prevent state desync during scroll; fixed in 0d60ec1 | 🟡 TESTING — needs validation |
+| Decision | Alternative(s) Rejected | Why | Status |
+|----------|-------------------------|-----|--------|
+| CustomTkinter / Tkinter for GUI | Qt/PyQt5, Electron, Kivy | Lightweight, native look on Windows, zero heavy external binary deps | ✅ LOCKED |
+| ONNX / OpenCV for face models | TensorFlow, PyTorch | Fast inference, small footprint (< 20MB vs > 500MB) | ✅ LOCKED |
+| Watchdog for folder monitoring | Manual polling, OS specific hooks | Cross-platform, event debouncing built-in | ✅ LOCKED |
+| JSON for settings storage | SQLite, YAML, INI | Human-readable, native stdlib support | ✅ LOCKED |
+| Content-aware cache key | mtime-only key | Prevents stale cache hit when timestamp preserved | ✅ LOCKED |
+| System Vault with `.undo_manifest.json` | Relational DB | Reversible, file-system native, human-readable | ✅ LOCKED |
 
 ---
 
 ## Violation & Escalation Process
 
-### If a Constraint is Violated
-
-1. **Stop work** on that feature (do not commit to main)
-2. **File issue** referencing the constraint number (e.g., "Violates CONSTRAINT-001")
-3. **Root-cause analysis:** Which constraint? Why not caught earlier?
-4. **Choose one:**
-   - **A) Fix it** — revert change, fix root cause, re-submit (preferred)
-   - **B) Propose exception** — document in this file with explicit trade-off + approval from [owner TBD]
-5. **Update this file** if constraint wording was unclear or needs tightening
-
-### Escalation Path
-
-- **Constraints 001–003 (data safety):** Release-blocking; no exceptions without explicit sign-off
-- **Constraints 004–006 (UX):** Release-blocking for public builds; internal testing may skip temporarily
-- **Constraints 007–009 (platform/build):** Non-blocking for development; blocking for release builds
-
----
-
-## Review Checklist (Before Shipping Release)
-
-- [ ] No telemetry found in code or dependencies (audit: `pip list`, grep for requests/analytics)
-- [ ] Dry-run tests pass (paired actual vs. preview tests)
-- [ ] All destructive operations have backup + undo path
-- [ ] No operation > 5 sec without progress UI
-- [ ] Face cache invalidation strategy documented and implemented (if CACHE-001 fix included)
-- [ ] Installer code-signed (no SmartScreen warning)
-- [ ] Windows target verified (run on Windows 10 VM minimum)
-- [ ] Constraint violations log empty (or documented exceptions only)
-
----
-
-## Update Log
-
-| Date | Change | Rationale |
-|------|--------|-----------|
-| 2026-08-18 | Created this document (constraints.md) | Formalize hard rules; prevent silent relitigations |
-| — | To be updated as constraints evolve | — |
+1. **Stop work** on that feature (do not commit to main).
+2. **Identify root cause** and file issue in `docs/known-issues.md`.
+3. **Fix root cause** and write a regression test.
+4. **Update `PLAN.md` and `CLAUDE.md`/`AGENTS.md`** with findings.
+5. **Commit and push** the fix and tests to GitHub.
