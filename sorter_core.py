@@ -471,7 +471,7 @@ def format_bytes(size):
 UUID_REGEX = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 HEX_HASH_REGEX = re.compile(r'^[0-9a-fA-F]{12,}$')
 META_CDN_REGEX = re.compile(r'^\d+_\d{10,}_\d{10,}_[a-zA-Z0-9]+$', re.IGNORECASE)
-CDN_MEDIA_SUFFIX_REGEX = re.compile(r'[_-](video_dashinit|transcode_output_dashinit|transcode_oil_output_dashinit|video_init|audio_dashinit|media_dashinit|dash_init)$', re.IGNORECASE)
+CDN_MEDIA_SUFFIX_REGEX = re.compile(r'[_-](video_dashinit|transcode_output_dashinit|transcode_oil_output_dashinit|video_init|audio_dashinit|media_dashinit|dash_init)(?:[_-]\d+)?$', re.IGNORECASE)
 CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{5,}')
 COMMON_HUMAN_WORD_ROOTS = {
     'image', 'photo', 'picture', 'screenshot', 'screen', 'video', 'vid',
