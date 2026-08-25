@@ -154,9 +154,9 @@ class FolderWatcherService:
 
         for fpath in ready_files:
             try:
-                parent_dir = os.path.dirname(fpath)
+                base_dir = self.watched_folder if os.path.exists(self.watched_folder) else os.path.dirname(fpath)
                 stats, manifest = organize_directory(
-                    main_folder=parent_dir,
+                    main_folder=base_dir,
                     selected_files=[fpath],
                     sort_category=self.sort_category,
                     date_source=self.date_source,

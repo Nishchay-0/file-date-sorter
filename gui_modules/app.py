@@ -981,7 +981,7 @@ if HAS_CUSTOMTKINTER:
             def run_conv_thread():
                 try:
                     stats = run_converter_batch(
-                        items=items,
+                        preview_items=items,
                         output_dir=dest_dir if dest_dir else None,
                         delete_original=delete_orig,
                         progress_callback=lambda c, t, fp, msg, tag: self.after(0, self.update_conv_progress, c, t, fp, msg),
@@ -991,11 +991,14 @@ if HAS_CUSTOMTKINTER:
                     def finished():
                         self.conv_start_btn.configure(state="normal")
                         self.status_var.set("Converter execution finished!")
+                        converted_count = stats.get('processed', stats.get('converted', 0))
+                        skipped_count = stats.get('skipped_corrupt', stats.get('skipped', 0))
+                        error_count = stats.get('errors', 0)
                         messagebox.showinfo(
                             "Conversion Complete",
-                            f"Successfully Converted: {stats['converted']}\n"
-                            f"Skipped / Unchanged:  {stats['skipped']}\n"
-                            f"Errors Encountered:    {stats['errors']}"
+                            f"Successfully Converted: {converted_count}\n"
+                            f"Skipped / Unchanged:  {skipped_count}\n"
+                            f"Errors Encountered:    {error_count}"
                         )
                         self.refresh_converter_preview()
 

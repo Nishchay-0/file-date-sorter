@@ -191,6 +191,10 @@ def main():
             print(f"Undo error: {e}")
             sys.exit(1)
 
+    if not args.path:
+        parser.print_help()
+        sys.exit(1)
+
     target_dir = os.path.abspath(args.path)
 
     inc_exts = [e.strip() for e in args.include_exts.split(',')] if args.include_exts else None

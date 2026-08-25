@@ -570,39 +570,6 @@ class FaceSorterEngine:
             return True
 
         return False
-        """Pure numpy cosine distance DBSCAN clustering implementation."""
-        n = len(X_norm)
-        labels = [-1] * n
-        cluster_id = 0
-        visited = [False] * n
-
-        # Pairwise cosine distance matrix
-        sim_matrix = np.dot(X_norm, X_norm.T)
-        dist_matrix = 1.0 - sim_matrix
-
-        for i in range(n):
-            if visited[i]:
-                continue
-            visited[i] = True
-            neighbors = np.where(dist_matrix[i] <= eps)[0].tolist()
-            if len(neighbors) < min_samples:
-                labels[i] = -1
-            else:
-                labels[i] = cluster_id
-                k = 0
-                while k < len(neighbors):
-                    neighbor_idx = neighbors[k]
-                    if not visited[neighbor_idx]:
-                        visited[neighbor_idx] = True
-                        n_neighbors = np.where(dist_matrix[neighbor_idx] <= eps)[0].tolist()
-                        if len(n_neighbors) >= min_samples:
-                            neighbors.extend(n_neighbors)
-                    if labels[neighbor_idx] == -1:
-                        labels[neighbor_idx] = cluster_id
-                    k += 1
-                cluster_id += 1
-
-        return labels
 
     def create_people_shortcuts(self, destination_dir):
         """

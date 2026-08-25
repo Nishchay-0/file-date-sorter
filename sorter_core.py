@@ -656,6 +656,8 @@ def is_path_excluded(path_to_check, exclude_folders, base_folder=None):
                     rel_parts = set(rel_parts_str.split(os.sep))
                     if rel_parts.intersection(compiled["names"]):
                         return True
+                elif os.path.basename(target_norm) in compiled["names"]:
+                    return True
             except Exception:
                 pass
         else:
@@ -1351,17 +1353,14 @@ def move_duplicate_files(file_paths, dest_folder):
         safe_fp = fix_win_long_path(fp)
         try:
             if os.path.exists(safe_fp):
-                target_path = os.path.join(dest_folder, os.path.basename(fp))
+                target_path = resolve_filename_collision(dest_folder, os.path.basename(fp))
                 safe_target = fix_win_long_path(target_path)
                 is_safe, reason = verify_safe_overwrite(safe_fp, safe_target)
                 if not is_safe:
                     errors += 1
                     continue
-                if not os.path.exists(safe_target):
-                    shutil.move(safe_fp, safe_target)
-                    moved += 1
-                else:
-                    errors += 1
+                shutil.move(safe_fp, safe_target)
+                moved += 1
         except Exception:
             errors += 1
     return {"moved": moved, "errors": errors}
@@ -1567,7 +1566,7 @@ def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders
             if os.path.abspath(root) == os.path.abspath(folder):
                 continue
 
-            if is_path_excluded(root, exclude_folders, base_folder=folder):
+            if is_path_excluded(root, merged_excludes, base_folder=folder):
                 continue
 
             safe_root = fix_win_long_path(root)
@@ -1608,7 +1607,14 @@ def scan_empty_dirs_preview(folder, remove_os_junk=True, exclude_folders=None):
     if not os.path.isdir(fix_win_long_path(folder)):
         return []
 
-    if is_path_excluded(folder, exclude_folders, base_folder=folder):
+    merged_excludes = list(DEFAULT_EXCLUDED_FOLDERS)
+    if exclude_folders:
+        if isinstance(exclude_folders, (list, tuple, set)):
+            merged_excludes.extend(list(exclude_folders))
+        elif isinstance(exclude_folders, str):
+            merged_excludes.extend([p.strip() for p in exclude_folders.replace(',', ';').split(';') if p.strip()])
+
+    if is_path_excluded(folder, merged_excludes, base_folder=folder):
         return []
 
     OS_JUNK_FILES = {'desktop.ini', 'thumbs.db', '.ds_store', '.bridgeortcache', '.bridgeortcachet'}
@@ -1621,7 +1627,7 @@ def scan_empty_dirs_preview(folder, remove_os_junk=True, exclude_folders=None):
             if os.path.abspath(root) == os.path.abspath(folder):
                 continue
 
-            if is_path_excluded(root, exclude_folders, base_folder=folder):
+            if is_path_excluded(root, merged_excludes, base_folder=folder):
                 continue
 
             abs_root = os.path.abspath(root)
@@ -1669,10 +1675,17 @@ def scan_empty_dirs_preview(folder, remove_os_junk=True, exclude_folders=None):
     return empty_folders
 
 
-def delete_empty_folder_batch(folder_paths, remove_os_junk=True):
+def delete_empty_folder_batch(folder_paths, remove_os_junk=True, exclude_folders=None):
     """
     Deletes a specific list of empty directory paths safely.
     """
+    merged_excludes = list(DEFAULT_EXCLUDED_FOLDERS)
+    if exclude_folders:
+        if isinstance(exclude_folders, (list, tuple, set)):
+            merged_excludes.extend(list(exclude_folders))
+        elif isinstance(exclude_folders, str):
+            merged_excludes.extend([p.strip() for p in exclude_folders.replace(',', ';').split(';') if p.strip()])
+
     OS_JUNK_FILES = {'desktop.ini', 'thumbs.db', '.ds_store', '.bridgeortcache', '.bridgeortcachet'}
     deleted = 0
     errors = 0
@@ -1680,6 +1693,8 @@ def delete_empty_folder_batch(folder_paths, remove_os_junk=True):
     sorted_paths = sorted(folder_paths, key=lambda x: os.path.abspath(x).count(os.sep), reverse=True)
 
     for fp in sorted_paths:
+        if is_path_excluded(fp, merged_excludes, base_folder=fp):
+            continue
         safe_fp = fix_win_long_path(fp)
         if not os.path.isdir(safe_fp):
             continue
@@ -2082,8 +2097,9 @@ def batch_rename_files(
         elif case_transform == "title":
             new_base = new_base.title()
         elif case_transform == "camel":
-            words = re.split(r'[\s_\-]+', new_base)
-            new_base = words[0].lower() + "".join(w.capitalize() for w in words[1:])
+            words = [w for w in re.split(r'[\s_\-]+', new_base) if w]
+            if words:
+                new_base = words[0].lower() + "".join(w.capitalize() for w in words[1:])
 
         date_obj = get_file_date(fp, 'ctime')
         cat = get_file_category(old_filename)
@@ -2100,6 +2116,10 @@ def batch_rename_files(
 
         if new_filepath == fp:
             continue
+
+        if os.path.exists(fix_win_long_path(new_filepath)):
+            new_filepath = resolve_filename_collision(dir_name, final_filename)
+            final_filename = os.path.basename(new_filepath)
 
         safe_new_fp = fix_win_long_path(new_filepath)
 
@@ -2614,7 +2634,16 @@ def convert_single_file(src_path, dest_dir=None, target_ext=".mp3", delete_origi
 
     curr_ext = os.path.splitext(src_path)[1].lower()
     if curr_ext == target_ext.lower():
-        return True, out_path
+        if os.path.abspath(out_dir) == os.path.abspath(os.path.dirname(src_path)):
+            return True, out_path
+        try:
+            shutil.copy2(safe_src, safe_out)
+            if delete_original:
+                try: os.remove(safe_src)
+                except Exception: pass
+            return True, out_path
+        except Exception as e:
+            return False, str(e)
 
     # Check for corrupt null-padded files (all 0x00 bytes)
     try:
