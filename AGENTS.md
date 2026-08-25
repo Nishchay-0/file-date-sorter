@@ -98,7 +98,8 @@ python build_exe.py
 | File | Responsibility |
 | :--- | :--- |
 | [`gui_modules/app.py`](file:///c:/file-date-sorter/gui_modules/app.py) | Root CustomTkinter application window (`SmartFileOrganizerGUI`), tab navigation, theme manager, progress handling, atomic repaint coordinator. |
-| [`gui_modules/theme_manager.py`](file:///c:/file-date-sorter/gui_modules/theme_manager.py) | Apple Glassmorphism design system: color palette tokens (`GLASS`), fonts (`FONTS`), glass panels (`glass_frame`), accent buttons (`accent_button`), status badges (`status_badge`), hover pulse micro-animations. |
+| [`gui_modules/sidebar.py`](file:///c:/file-date-sorter/gui_modules/sidebar.py) | Right-side collapsible toolbar navigation (`RightSidebarToolbar`), icon+text buttons, active tool highlighting, glass styling. |
+| [`gui_modules/theme_manager.py`](file:///c:/file-date-sorter/gui_modules/theme_manager.py) | Apple Glassmorphism design system: color palette tokens (`GLASS`, `LIGHT_THEME`, `DARK_THEME`), fonts (`FONTS`), glass panels (`glass_frame`), accent buttons (`accent_button`), status badges (`status_badge`), hover pulse micro-animations. |
 | [`gui_modules/components.py`](file:///c:/file-date-sorter/gui_modules/components.py) | Reusable UI components: `HeaderCard`, `MetricCard`, `ActionButton`, `StyledEntry`, `FolderPicker`, `StatusBadge`, `GlassCard`. |
 | [`gui_modules/context_menu.py`](file:///c:/file-date-sorter/gui_modules/context_menu.py) | Native right-click popups for file lists and preview items. |
 | [`gui_modules/views/tab_sorter.py`](file:///c:/file-date-sorter/gui_modules/views/tab_sorter.py) | Organization & Date/Category/Extension sorting view. |

@@ -34,6 +34,7 @@ from gui_modules.views.tab_analytics import setup_insights_tab
 from gui_modules.views.tab_watcher import setup_watcher_tab
 from gui_modules.views.tab_exclusions import setup_exclusions_tab
 from gui_modules.views.tab_people import setup_people_tab
+from gui_modules.sidebar import RightSidebarToolbar
 
 from sorter_core import (
     organize_directory,
@@ -462,12 +463,40 @@ if HAS_CUSTOMTKINTER:
                                      fg_color="#0288d1", text_color="white", corner_radius=20)
                 b.pack(side="left", padx=(0, 6))
 
-            # Theme toggle — segmented button (Dark / Light)
-            theme_box = ctk.CTkFrame(top_card, fg_color="transparent")
-            theme_box.grid(row=0, column=1, rowspan=2, sticky="e", padx=14)
+            # Top Actions & Theme toggle — segmented button (Dark / Light)
+            top_actions = ctk.CTkFrame(top_card, fg_color="transparent")
+            top_actions.grid(row=0, column=1, rowspan=2, sticky="e", padx=14)
+
+            # Global 1-Click Undo button
+            ctk.CTkButton(
+                top_actions,
+                text="↩️ Undo",
+                command=self.open_system_vault_restore_manager,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                height=30,
+                width=75,
+                corner_radius=10,
+                fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray80", "gray25"),
+                text_color=GLASS["text_primary"] if HAS_THEME else ("gray10", "gray90"),
+                hover_color=GLASS["bg_hover"] if HAS_THEME else ("gray70", "gray35")
+            ).pack(side="left", padx=(0, 6))
+
+            # System Vault button
+            ctk.CTkButton(
+                top_actions,
+                text="🛡️ Vault",
+                command=self.open_system_vault_restore_manager,
+                font=ctk.CTkFont(size=11, weight="bold"),
+                height=30,
+                width=75,
+                corner_radius=10,
+                fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray80", "gray25"),
+                text_color=GLASS["text_primary"] if HAS_THEME else ("gray10", "gray90"),
+                hover_color=GLASS["bg_hover"] if HAS_THEME else ("gray70", "gray35")
+            ).pack(side="left", padx=(0, 8))
 
             self.theme_seg = ctk.CTkSegmentedButton(
-                theme_box,
+                top_actions,
                 values=["🌙 Dark", "☀️ Light"],
                 command=self._on_theme_seg_changed,
                 font=ctk.CTkFont(size=11, weight="bold"),
@@ -475,7 +504,7 @@ if HAS_CUSTOMTKINTER:
                 height=30,
             )
             self.theme_seg.set("🌙 Dark")
-            self.theme_seg.pack(side="right")
+            self.theme_seg.pack(side="left")
 
             # Keep backward-compat: create a dummy theme_switch-like object
             class _DummySwitch:
@@ -495,6 +524,10 @@ if HAS_CUSTOMTKINTER:
             )
             main_card.pack(fill="both", expand=True, padx=10, pady=(0, 4))
 
+            # ── Right Sidebar Toolbar ──────────────────────────────────────────
+            self.sidebar = RightSidebarToolbar(main_card, self)
+            self.sidebar.pack(side="right", fill="y", padx=(2, 4), pady=4)
+
             # ── Tab Navigation View ────────────────────────────────────────────
             self.tabview = ctk.CTkTabview(
                 main_card,
@@ -510,7 +543,7 @@ if HAS_CUSTOMTKINTER:
                 segmented_button_unselected_hover_color=GLASS["bg_hover"] if HAS_THEME else None,
                 text_color=GLASS["text_primary"] if HAS_THEME else None,
             )
-            self.tabview.pack(fill="both", expand=True, padx=4, pady=4)
+            self.tabview.pack(side="left", fill="both", expand=True, padx=(4, 2), pady=4)
 
             self.tab_organizer = self.tabview.add("📅 File Organizer")
             self.tab_duplicates = self.tabview.add("🔍 Duplicates Finder")
@@ -651,8 +684,51 @@ if HAS_CUSTOMTKINTER:
                 setup_exclusions_tab(self)
                 self._tabs_loaded["exclusions"] = True
 
+            # Sync RightSidebarToolbar active selection
+            tab_to_key = {
+                "Organizer": "organizer",
+                "Duplicates": "duplicates",
+                "People": "people",
+                "Extractor": "extractor",
+                "Converter": "converter",
+                "Renamer": "renamer",
+                "Cleaner": "cleaner",
+                "Analytics": "analytics",
+                "Watcher": "watcher",
+                "Exclusions": "exclusions",
+            }
+            if hasattr(self, 'sidebar') and self.sidebar:
+                for k_name, k_code in tab_to_key.items():
+                    if k_name in current:
+                        self.sidebar.update_active_highlight(k_code)
+                        break
+
             # Atomic Visual State Re-assertion
             self.after(50, lambda: self._atomic_repaint_tab_widgets())
+
+        def show_panel(self, tool_key: str):
+            """Switches the active tool panel from the Right Sidebar Toolbar."""
+            key_to_tab = {
+                "organizer": "📅 File Organizer",
+                "duplicates": "🔍 Duplicates Finder",
+                "people": "👥 People Sorter",
+                "extractor": "📦 Subfolder Extractor",
+                "converter": "🪄 Magic Converter",
+                "renamer": "🏷️ Bulk Renamer",
+                "cleaner": "🧹 Storage Cleaner",
+                "analytics": "📊 Analytics",
+                "watcher": "👁️ Auto Watcher",
+                "exclusions": "🚫 Exclusions",
+            }
+            tab_name = key_to_tab.get(tool_key, "📅 File Organizer")
+            if hasattr(self, 'tabview'):
+                try:
+                    self.tabview.set(tab_name)
+                except Exception:
+                    pass
+            self._on_tab_changed(tab_name)
+            if hasattr(self, 'sidebar') and self.sidebar:
+                self.sidebar.update_active_highlight(tool_key)
 
         def _on_watcher_notify(self, message):
             if hasattr(self, 'dup_log'):

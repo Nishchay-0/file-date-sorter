@@ -1,4 +1,4 @@
-﻿"""
+"""
 theme_manager.py — Apple Glassmorphism Design System
 Smart File Organizer Suite Pro
 
@@ -202,8 +202,42 @@ def animate_hover(widget, enter_color, leave_color):
         pass
 
 
+LIGHT_THEME = {
+    "bg_primary": "#F2F2F7",
+    "bg_card": "#FFFFFF",
+    "bg_card_alt": "#F5F5F7",
+    "bg_hover": "#E8E8ED",
+    "bg_selected": "#D1D1D6",
+    "accent": "#007AFF",
+    "text_primary": "#1C1C1E",
+    "text_secondary": "#8E8E93",
+    "border": "#C6C6C8",
+}
+
+DARK_THEME = {
+    "bg_primary": "#1C1C1E",
+    "bg_card": "#2C2C2E",
+    "bg_card_alt": "#242426",
+    "bg_hover": "#38383A",
+    "bg_selected": "#48484A",
+    "accent": "#0A84FF",
+    "text_primary": "#F2F2F7",
+    "text_secondary": "#98989D",
+    "border": "#38383A",
+}
+
+
+def apply_theme(mode: str = "dark"):
+    """Applies global appearance mode (light / dark)."""
+    if not HAS_CTK:
+        return
+    m = mode.lower()
+    if m in ["light", "dark", "system"]:
+        ctk.set_appearance_mode(m.capitalize())
+
+
 def apply_glass_theme(mode: str = "dark"):
     if not HAS_CTK:
         return
-    ctk.set_appearance_mode(mode.capitalize())
+    apply_theme(mode)
     ctk.set_default_color_theme("blue")
