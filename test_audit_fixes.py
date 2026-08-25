@@ -128,6 +128,22 @@ class TestAuditFixes(unittest.TestCase):
         self.assertIn("errors", stats)
         self.assertEqual(stats["processed"], 1)
 
+    def test_07_clean_empty_dirs_with_readonly_os_junk(self):
+        """Verify clean_empty_dirs and delete_empty_folder_batch delete folders with read-only desktop.ini."""
+        import stat
+        empty_folder = os.path.join(self.test_dir, "junk_folder")
+        os.makedirs(empty_folder, exist_ok=True)
+        ini_file = os.path.join(empty_folder, "desktop.ini")
+        with open(ini_file, "w") as f:
+            f.write("[.ShellClassInfo]\nIconResource=test.ico,0\n")
+        
+        # Set read-only attribute
+        os.chmod(ini_file, stat.S_IREAD)
+
+        cleaned = clean_empty_dirs(self.test_dir, remove_os_junk=True)
+        self.assertEqual(cleaned, 1)
+        self.assertFalse(os.path.exists(empty_folder))
+
 
 if __name__ == "__main__":
     unittest.main()

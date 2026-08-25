@@ -1537,11 +1537,41 @@ def scan_directory_preview(
     return preview_items, category_counts, summary
 
 
+def _force_remove_file(file_path):
+    safe_path = fix_win_long_path(file_path)
+    try:
+        import stat
+        os.chmod(safe_path, stat.S_IWRITE | stat.S_IREAD)
+    except Exception:
+        pass
+    try:
+        os.remove(safe_path)
+        return True
+    except Exception:
+        return False
+
+
+def _force_rmdir(dir_path):
+    safe_path = fix_win_long_path(dir_path)
+    try:
+        import stat
+        os.chmod(safe_path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+    except Exception:
+        pass
+    try:
+        os.rmdir(safe_path)
+        return True
+    except Exception:
+        return False
+
+
 def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders=None):
     """
     Recursively removes empty directories within folder.
     """
-    folder = os.path.abspath(folder)
+    if not folder:
+        return 0
+    folder = os.path.abspath(str(folder).strip().strip('\'"'))
     if not os.path.isdir(fix_win_long_path(folder)):
         return 0
 
@@ -1551,8 +1581,6 @@ def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders
             merged_excludes.extend(list(exclude_folders))
         elif isinstance(exclude_folders, str):
             merged_excludes.extend([p.strip() for p in exclude_folders.replace(',', ';').split(';') if p.strip()])
-    if is_path_excluded(folder, merged_excludes, base_folder=folder):
-        return 0
 
     OS_JUNK_FILES = {'desktop.ini', 'thumbs.db', '.ds_store', '.bridgeortcache', '.bridgeortcachet'}
 
@@ -1578,17 +1606,15 @@ def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders
                         for item in entries:
                             item_path = os.path.join(root, item)
                             try:
-                                safe_item = fix_win_long_path(item_path)
-                                if os.path.isfile(safe_item):
-                                    os.remove(safe_item)
+                                _force_remove_file(item_path)
                             except Exception:
                                 pass
                         entries = os.listdir(safe_root)
 
                 if not entries:
-                    os.rmdir(safe_root)
-                    removed_in_pass += 1
-                    cleaned_count += 1
+                    if _force_rmdir(root):
+                        removed_in_pass += 1
+                        cleaned_count += 1
             except Exception:
                 pass
 
@@ -1603,7 +1629,9 @@ def scan_empty_dirs_preview(folder, remove_os_junk=True, exclude_folders=None):
     Scans folder directory tree and returns a list of empty (or OS-junk-only) directories for preview.
     Does NOT delete any directories on disk.
     """
-    folder = os.path.abspath(folder)
+    if not folder:
+        return []
+    folder = os.path.abspath(str(folder).strip().strip('\'"'))
     if not os.path.isdir(fix_win_long_path(folder)):
         return []
 
@@ -1613,9 +1641,6 @@ def scan_empty_dirs_preview(folder, remove_os_junk=True, exclude_folders=None):
             merged_excludes.extend(list(exclude_folders))
         elif isinstance(exclude_folders, str):
             merged_excludes.extend([p.strip() for p in exclude_folders.replace(',', ';').split(';') if p.strip()])
-
-    if is_path_excluded(folder, merged_excludes, base_folder=folder):
-        return []
 
     OS_JUNK_FILES = {'desktop.ini', 'thumbs.db', '.ds_store', '.bridgeortcache', '.bridgeortcachet'}
     known_empty_dirs = set()
@@ -1679,6 +1704,9 @@ def delete_empty_folder_batch(folder_paths, remove_os_junk=True, exclude_folders
     """
     Deletes a specific list of empty directory paths safely.
     """
+    if not folder_paths:
+        return {"deleted": 0, "errors": 0}
+
     merged_excludes = list(DEFAULT_EXCLUDED_FOLDERS)
     if exclude_folders:
         if isinstance(exclude_folders, (list, tuple, set)):
@@ -1693,7 +1721,7 @@ def delete_empty_folder_batch(folder_paths, remove_os_junk=True, exclude_folders
     sorted_paths = sorted(folder_paths, key=lambda x: os.path.abspath(x).count(os.sep), reverse=True)
 
     for fp in sorted_paths:
-        if is_path_excluded(fp, merged_excludes, base_folder=fp):
+        if is_path_excluded(fp, merged_excludes):
             continue
         safe_fp = fix_win_long_path(fp)
         if not os.path.isdir(safe_fp):
@@ -1703,17 +1731,15 @@ def delete_empty_folder_batch(folder_paths, remove_os_junk=True, exclude_folders
             if remove_os_junk:
                 for item in entries:
                     item_path = os.path.join(fp, item)
-                    safe_item = fix_win_long_path(item_path)
-                    if os.path.isfile(safe_item) and item.lower() in OS_JUNK_FILES:
-                        try:
-                            os.remove(safe_item)
-                        except Exception:
-                            pass
+                    if item.lower() in OS_JUNK_FILES:
+                        _force_remove_file(item_path)
                 entries = [e for e in os.listdir(safe_fp) if e.lower() not in OS_JUNK_FILES]
             
             if not entries:
-                os.rmdir(safe_fp)
-                deleted += 1
+                if _force_rmdir(fp):
+                    deleted += 1
+                else:
+                    errors += 1
             else:
                 errors += 1
         except Exception:

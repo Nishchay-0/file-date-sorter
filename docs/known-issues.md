@@ -16,7 +16,8 @@
 | **SCROLL-002** | Background tab scrolling instead of active tab (mousewheel fallback) | ✅ **FIXED** | Regression test: `test_scrolling_background_fix.py` (5/5 pass) | Active tab detection with mousewheel listener |
 | **PEOPLE-001** | Face clustering mega-cluster absorption (outlier merging) | ✅ **FIXED** | Complete-linkage cosine thresholding in `face_sort.py` | Validated in `test_people_sorter.py` |
 | **FACE-001** | OpenCV model concurrency crash (thread safety) | ✅ **FIXED** | Thread lock around model inference; `test_people_clustering_tune.py` | Thread-safe locks verified |
-| **CACHE-001** | `.people_cache.json` invalidation insufficient (mtime-only check) | ✅ **FIXED** | Content-aware hash + schema version key in `face_sort.py` | Verified in `test_people_sorter.py` |
+| **DUP-002** | Missing `count_cloud_placeholders` import in `gui_modules/app.py` caused NameError on Duplicate Scan | ✅ **FIXED** | Verified in Pytest suite (34/34 passed) | Added import and wrapped cloud pre-check in try/except |
+| **CLN-001** | Empty folder cleaner failed to delete directories containing read-only OS junk (`desktop.ini`, `thumbs.db`) or when root path had quotes | ✅ **FIXED** | Verified in `test_audit_fixes.py::test_07_clean_empty_dirs_with_readonly_os_junk` | Added `_force_remove_file` & `_force_rmdir` with `os.chmod` permission overrides and path sanitization |
 
 ---
 

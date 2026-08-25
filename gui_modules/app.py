@@ -1563,7 +1563,11 @@ if HAS_CUSTOMTKINTER:
             threading.Thread(target=worker, daemon=True).start()
 
         def run_delete_empty_folders(self, target_dir):
-            if not target_dir or not os.path.isdir(fix_win_long_path(target_dir)):
+            if not target_dir:
+                messagebox.showwarning("Missing Directory", "Please select a valid directory first.")
+                return
+            target_dir = str(target_dir).strip().strip('\'"')
+            if not os.path.isdir(fix_win_long_path(target_dir)):
                 messagebox.showwarning("Missing Directory", "Please select a valid directory first.")
                 return
 
@@ -5502,12 +5506,13 @@ if HAS_CUSTOMTKINTER:
             if not messagebox.askyesno("Confirm Empty Folder Deletion", f"Are you sure you want to delete {len(paths_to_delete)} selected empty folder(s)?"):
                 return
 
-            res = delete_empty_folder_batch(paths_to_delete, remove_os_junk=self.empty_remove_os_junk_var.get())
+            exc_folds = self.parse_comma_list(self.exclude_folders_var.get().strip())
+            res = delete_empty_folder_batch(paths_to_delete, remove_os_junk=self.empty_remove_os_junk_var.get(), exclude_folders=exc_folds)
             messagebox.showinfo("Empty Folders Deleted", f"Successfully deleted {res['deleted']} empty folder(s)!\nErrors: {res['errors']}")
             self.run_empty_folder_scan()
 
         def delete_all_empty_folders(self):
-            folder = self.cln_dir_var.get().strip()
+            folder = self.cln_dir_var.get().strip().strip('\'"')
             if not folder or not os.path.isdir(fix_win_long_path(folder)):
                 messagebox.showwarning("Missing Directory", "Please select a valid directory first.")
                 return
