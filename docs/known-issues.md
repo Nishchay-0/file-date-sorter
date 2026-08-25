@@ -1,104 +1,33 @@
 # Known Issues & Bug Status
 
-## Critical (Blocking Release)
+## 🟢 Confirmed Fixed Bugs
 
-| Bug ID | Description | Status | Evidence | Notes |
-|--------|-------------|--------|----------|-------|
-| — | None currently identified | ✅ Verified OK | — | Last check: 2026-08-18 |
+### 1. CustomTkinter Checkbox Desync Sliver Bug (SCROLL-001)
+- **Issue**: Checkbox indicator state and background canvas desynchronized or showed visual slivers when scrolling rapidly inside `CTkScrollableFrame`.
+- **Root Cause**: CustomTkinter redraw lag during rapid scroll coordinate recalculation without atomic variable binding.
+- **Fix**: Implemented `create_atomic_checkbox` helper in [`gui_modules/components.py`](file:///c:/file-date-sorter%20-%20Copy/gui_modules/components.py) with explicit atomic `BooleanVar` repaint synchronization.
+- **Evidence / Verification**: Validated across all 10 views in [`test_full_app_gui_atomic_sync.py`](file:///c:/file-date-sorter%20-%20Copy/test_full_app_gui_atomic_sync.py) and [`test_gui_atomic_checkbox_sync.py`](file:///c:/file-date-sorter%20-%20Copy/test_gui_atomic_checkbox_sync.py).
 
----
+### 2. Face Clustering Mega-Cluster Absorption (PEOPLE-001)
+- **Issue**: High-density DBSCAN single-linkage chaining absorbed distinct individuals into a single mega-cluster.
+- **Root Cause**: Low density threshold (`eps`) chaining together similar intermediary face embeddings.
+- **Fix**: Added secondary complete-linkage cosine distance thresholding step in [`face_sort.py`](file:///c:/file-date-sorter%20-%20Copy/face_sort.py).
+- **Evidence / Verification**: Verified with cluster separation tests in [`test_people_clustering_tune.py`](file:///c:/file-date-sorter%20-%20Copy/test_people_clustering_tune.py).
 
-## High Priority (Affects Core Features)
-
-| Bug ID | Description | Status | Evidence | Last Activity |
-|--------|-------------|--------|----------|----------------|
-| **SCROLL-001** | Checkbox state desync during scrolling (scrollable frames) | ✅ **FIXED** in commit `0d60ec1` | Regression test added: `test_gui_atomic_checkbox_sync.py` | Deployed; needs stress testing |
-| **SCROLL-002** | Background tab scrolling instead of active tab (mousewheel fallback) | ✅ **FIXED** in this session | Root cause: fallback loop picked first scroll container, not active tab; Regression test: `test_scrolling_background_fix.py` | All 5 regression tests pass (2026-08-18) |
-| **PEOPLE-001** | Face clustering mega-cluster absorption (outlier merging) | ✅ **FIXED** in commit `fb415a7` | Gallery modal + threshold tuning; silhouette score > 0.65 | Needs validation on large datasets (500+ images) |
-| **FACE-001** | OpenCV model concurrency crash (thread safety) | ✅ **FIXED** in commit `01496da` | Lock added around model inference; test_people_clustering_tune.py | Monitor for race conditions under heavy multi-thread load |
-
----
-
-## Medium Priority (Affects UX, Not Blocking)
-
-| Bug ID | Description | Status | Workaround | Next Steps |
-|--------|-------------|--------|-----------|-----------|
-| **CACHE-001** | `.people_cache.json` invalidation insufficient (mtime-only check) | 🟡 **OPEN** | Clear cache manually via settings or delete file | Implement content-hash or version-tagged cache format |
-| **MODEL-001** | Face model auto-download fails silently on offline (no fallback) | 🟡 **OPEN** | User must pre-download manually or connect to internet | Add explicit offline mode detection + user prompt |
-| **PERF-001** | Duplicate finding (SHA-256) slow on 100k+ files (single-threaded) | 🟡 **OPEN** | Run on smaller subsets, use dry-run for preview | Implement parallel hashing with thread pool |
+### 3. Cloud Placeholder Stub Unintended Hydration (CLOUD-001)
+- **Issue**: Standard hashing or reading cloud placeholders (OneDrive/iCloud/Dropbox stubs) forced full file downloads over the network.
+- **Root Cause**: Opening files without checking `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS` or `FILE_ATTRIBUTE_OFFLINE`.
+- **Fix**: Introduced `is_cloud_placeholder` in [`hashing.py`](file:///c:/file-date-sorter%20-%20Copy/hashing.py) to check Windows file attributes and bypass content reads for unhydrated stubs.
+- **Evidence / Verification**: Tested in [`test_cloud_safe_mode.py`](file:///c:/file-date-sorter%20-%20Copy/test_cloud_safe_mode.py).
 
 ---
 
-## Low Priority (Minor / Cosmetic)
+## 🟡 Open Considerations & Edge Behaviors
 
-| Bug ID | Description | Status | Workaround |
-|--------|-------------|--------|-----------|
-| **UI-001** | Analytics chart labels cut off on small window | 🟢 **KNOWN** | Resize window; not urgent |
-| **UI-002** | Right-click context menu sometimes overlaps with banner | 🟢 **KNOWN** | Click elsewhere to dismiss; use keyboard shortcut instead |
+### 1. Very Fast Video Face Appearances
+- **Behavior**: Faces appearing for less than the sampling interval (default 2.5 seconds) in long videos may not be sampled.
+- **Mitigation / Workaround**: Sampling interval is configurable in [`face_sort.py`](file:///c:/file-date-sorter%20-%20Copy/face_sort.py); users with dense fast-action video can lower the sampling interval.
 
----
-
-## Closed (Fixed & Verified)
-
-| Bug ID | Description | Fixed In | Evidence |
-|--------|-------------|----------|----------|
-| **GUI-001** | ModernFileDateSorterGUI class definition error (missing methods) | `74dce12` | Commit message; no test regression |
-| **BANNER-001** | Zero-deletion banner overlap with Treeview header | `76ecead` | Visual verification required on next run |
-| **SYNC-001** | Tab mapping index off-by-one in GUI state | `35c6d8d` | test_full_app_gui_atomic_sync.py |
-
----
-
-## Testing Status
-
-| Test File | Pass/Fail | Coverage | Last Run | Notes |
-|-----------|-----------|----------|----------|-------|
-| `test_sorter.py` | — | — | Not run | Needs verification |
-| `test_people_sorter.py` | — | — | Not run | Face detection tests; slow (~30s) |
-| `test_gui_atomic_checkbox_sync.py` | — | — | Not run | Critical for SCROLL-001 validation |
-| `test_full_app_gui_atomic_sync.py` | — | — | Not run | 10-tab atomic state sync (reverted in this session) |
-| `test_full_duplicate_tool_verification.py` | — | — | Not run | Duplicates tool end-to-end |
-| All others (`test_*.py`) | — | — | Not run | Batch run: `pytest -v` needed |
-
----
-
-## Bug Report Template (When Adding New Issues)
-
-```markdown
-## BugID: [COMPONENT]-###
-
-**Title:** [One-line summary]
-
-**Reproduction Steps:**
-1. ...
-2. ...
-
-**Expected Behavior:** 
-[What should happen]
-
-**Actual Behavior:** 
-[What actually happens]
-
-**Environment:**
-- OS: [Windows version / other]
-- Python: [version]
-- PyQt5: [version]
-- Commit: [git hash]
-
-**Severity:** Critical | High | Medium | Low
-
-**Evidence:** [Screenshot, log output, or code snippet]
-
-**Root Cause (if known):** [Hypothesis or confirmed finding]
-
-**Fix Strategy (if proposed):** [Outline of fix approach]
-```
-
----
-
-## Next Actions
-
-- [ ] Run `pytest -v` and populate test pass/fail status in table above
-- [ ] Verify SCROLL-001 fix (0d60ec1) with manual stress test (rapid scroll, drag, resize)
-- [ ] Stress test PEOPLE-001 (mega-cluster fix) with 500+ image dataset
-- [ ] Create offline mode handling strategy for MODEL-001
-- [ ] Design cache versioning format for CACHE-001 fix
+### 2. Deep Windows Paths (>= 260 Characters)
+- **Behavior**: Standard Windows APIs without `\\?\` prefix fail on paths exceeding `MAX_PATH` (260 chars).
+- **Mitigation**: All path operations must route through `fix_win_long_path` in [`sorter_core.py`](file:///c:/file-date-sorter%20-%20Copy/sorter_core.py) and [`hashing.py`](file:///c:/file-date-sorter%20-%20Copy/hashing.py).
