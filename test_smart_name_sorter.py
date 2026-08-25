@@ -252,6 +252,35 @@ class TestSmartNameSorter(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.test_dir, "2022-02-25_media~Snapchat-1499352345")))
         self.assertFalse(os.path.exists(os.path.join(self.test_dir, "Snapchat-236253845")))
 
+    def test_09_meta_fb_ig_cdn_hash_detection(self):
+        """
+        Verify long Meta/Facebook/Instagram CDN hash IDs (e.g. '0_103622762244864_4193263340616068702_n.jpg')
+        are detected as machine-generated hash strings and routed to 'Unsorted'.
+        """
+        cdn_files = [
+            "0_103622762244864_4193263340616068702_n.jpg",
+            "0_106831288427333_3112498358931756375_n.jpg",
+            "0_107070254781974_2473920447795041292_n.jpg",
+            "0_220501766303801_2249776331757950988_n.mp4",
+            "0_442298517898399_7372793828994381581_n.jpg"
+        ]
+
+        for fname in cdn_files:
+            fp = os.path.join(self.test_dir, fname)
+            with open(fp, "w") as f: f.write("cdn content")
+
+        stats, _ = organize_by_name(self.test_dir, dry_run=False)
+        self.assertEqual(stats["processed"], len(cdn_files))
+
+        unsorted_dir = os.path.join(self.test_dir, "Unsorted")
+        self.assertTrue(os.path.isdir(unsorted_dir))
+
+        for fname in cdn_files:
+            self.assertTrue(os.path.exists(os.path.join(unsorted_dir, fname)))
+
+        # Ensure individual hash folders were NOT created
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "0_103622762244864_4193263340616068702_n")))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -470,6 +470,7 @@ def format_bytes(size):
 
 UUID_REGEX = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 HEX_HASH_REGEX = re.compile(r'^[0-9a-fA-F]{12,}$')
+META_CDN_REGEX = re.compile(r'^\d+_\d{10,}_\d{10,}_[a-zA-Z0-9]+$', re.IGNORECASE)
 CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}')
 COMMON_HUMAN_WORD_ROOTS = {
     'image', 'photo', 'picture', 'screenshot', 'screen', 'video', 'vid',
@@ -488,14 +489,17 @@ def is_random_or_hash_name(filename_or_basename):
     Heuristics:
       1. UUID / GUID formats -> Random
       2. Pure hexadecimal hashes (MD5, SHA1, SHA256) of length >= 12 -> Random
-      3. Length >= 10 with NO separators ('_', '-', ' ', '.') and mixed letters+digits,
+      3. Meta / Facebook / Instagram CDN hash IDs (e.g. 0_103622762244864_4193263340616068702_n) -> Random
+      4. Multi-digit numeric ID sequences separated by underscores -> Random
+      5. Length >= 10 with NO separators ('_', '-', ' ', '.') and mixed letters+digits,
          no dictionary words, and abnormal consonant clusters (>4 consonants) or high entropy -> Random
-      4. Structured names (with separators or recognizable human words) -> Human Named
+      6. Structured names (with separators or recognizable human words) -> Human Named
     """
     if not filename_or_basename:
         return False, "Empty filename"
 
-    base_name = os.path.splitext(os.path.basename(filename_or_basename))[0].strip()
+    # Strip compound extensions first (.zip.nomedia, .jpg.nomedia)
+    base_name = strip_all_extensions(filename_or_basename).strip() if 'strip_all_extensions' in globals() else os.path.splitext(os.path.basename(filename_or_basename))[0].strip()
     if not base_name:
         return False, "Empty base filename"
 
@@ -507,7 +511,16 @@ def is_random_or_hash_name(filename_or_basename):
     if HEX_HASH_REGEX.match(base_name):
         return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
 
-    # 3. Separator Check: Names with '_', '-', ' ', '.' usually indicate human structured naming
+    # 3. Meta / Facebook / Instagram CDN Hash IDs (e.g. 0_103622762244864_4193263340616068702_n)
+    if META_CDN_REGEX.match(base_name):
+        return True, f"Facebook/Instagram/Meta CDN machine hash ID ('{base_name}')"
+
+    # 4. Multi-digit numeric ID sequences with separators (e.g. 0_103622762244864_4193263340616068702)
+    clean_no_sep = re.sub(r'[_\-\.\s]', '', base_name)
+    if clean_no_sep.isdigit() and len(clean_no_sep) >= 12:
+        return True, f"Numeric machine ID sequence ({len(clean_no_sep)} digits) ('{base_name}')"
+
+    # 5. Separator Check: Names with '_', '-', ' ', '.' usually indicate human structured naming
     has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
 
     if has_separator:
@@ -619,6 +632,8 @@ def extract_clean_title_prefix(filename_or_basename):
         if not tok:
             return True
         if tok.isdigit():
+            return True
+        if tok.lower() in ('n', 'o', 's', 'b', 'q', 'a', 'c', 'tmp', 'bak', 'nomedia'):
             return True
         if re.match(r'^\d{4}[-._]\d{2}[-._]\d{2}$', tok):
             return True
