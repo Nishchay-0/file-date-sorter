@@ -61,7 +61,8 @@ from sorter_core import (
     scan_converter_preview,
     run_converter_batch,
     get_system_vault_dir,
-    gather_files
+    gather_files,
+    count_cloud_placeholders
 )
 
 try:
@@ -1901,21 +1902,24 @@ if HAS_CUSTOMTKINTER:
 
             # Cloud-Aware Pre-Check & Informed Consent Dialog
             if match_mode in ('content', 'perceptual_image', 'text_similarity'):
-                cand_files = gather_files(target_dir, is_recursive, selected_files=selected_files)
-                cloud_info = count_cloud_placeholders(cand_files)
-                if cloud_info['cloud_count'] > 0:
-                    sz_mb = round(cloud_info['total_bytes'] / (1024.0 * 1024.0), 1)
-                    sz_str = f"{sz_mb} MB" if sz_mb < 1024 else f"{round(sz_mb/1024.0, 2)} GB"
-                    msg = (
-                        f"☁️ Cloud-Only Files Detected!\n\n"
-                        f"Definitive duplicate matching ({match_mode}) requires reading file contents.\n"
-                        f"This scan will download {cloud_info['cloud_count']} cloud-only placeholder file(s) "
-                        f"totaling approximately {sz_str}.\n\n"
-                        f"Do you want to proceed and download these cloud files?\n\n"
-                        f"(Tip: Choose 'No' and select '⚡ Quick Scan (Name + Size)' for 0-download scanning!)"
-                    )
-                    if not messagebox.askyesno("Cloud Download Confirmation", msg):
-                        return
+                try:
+                    cand_files = gather_files(target_dir, is_recursive, selected_files=selected_files)
+                    cloud_info = count_cloud_placeholders(cand_files)
+                    if cloud_info['cloud_count'] > 0:
+                        sz_mb = round(cloud_info['total_bytes'] / (1024.0 * 1024.0), 1)
+                        sz_str = f"{sz_mb} MB" if sz_mb < 1024 else f"{round(sz_mb/1024.0, 2)} GB"
+                        msg = (
+                            f"☁️ Cloud-Only Files Detected!\n\n"
+                            f"Definitive duplicate matching ({match_mode}) requires reading file contents.\n"
+                            f"This scan will download {cloud_info['cloud_count']} cloud-only placeholder file(s) "
+                            f"totaling approximately {sz_str}.\n\n"
+                            f"Do you want to proceed and download these cloud files?\n\n"
+                            f"(Tip: Choose 'No' and select '⚡ Quick Scan (Name + Size)' for 0-download scanning!)"
+                        )
+                        if not messagebox.askyesno("Cloud Download Confirmation", msg):
+                            return
+                except Exception as _cloud_err:
+                    pass  # Non-blocking: proceed with scan even if cloud check fails
             
             raw_thresh = getattr(self, "dup_threshold_var", None)
             thresh_val = 0.9
