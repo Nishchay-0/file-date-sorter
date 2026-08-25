@@ -82,40 +82,49 @@ def run_tests():
     with open(os.path.join(empty_sub, "desktop.ini"), "w") as f:
         f.write("[.ShellClassInfo]\nIconResource=C:\\Windows\\system32\\SHELL32.dll,4\n")
 
-    print("\n--- TEST 5: Word-Based Sorting + Single _Random Folder ---")
+    print("\n--- TEST 5: Meaningful Title Grouping (Stopword-aware) + Single _Random Folder ---")
     word_test_dir = os.path.abspath("test_folder_word_sort")
     if os.path.exists(word_test_dir):
         shutil.rmtree(word_test_dir)
     os.makedirs(word_test_dir, exist_ok=True)
 
     test_files = [
-        "amazon_bill_123.pdf",
-        "amazon_receipt_456.pdf",
-        "guru_notes.txt",
-        "guru_data.csv",
-        "336101256_21499.jpg",
+        "_the_june_pearl_-12102022-0001.mp4",
+        "the_silent_eyes_145-07062022-0001.mp4",
+        "my_document_2024.pdf",
+        "a_nice_photo.jpg",
+        "guru_finance_report.xls",
         "hfqgifcbkj9.png",
-        "323f9w8ehf8awjefi.docx"
+        "323f9w8ehf8awjefi.docx",
+        "336101256_21499.jpg"
     ]
     for tf in test_files:
         with open(os.path.join(word_test_dir, tf), "w") as f:
             f.write(f"content of {tf}")
 
     stats_word, _ = organize_directory(word_test_dir, sort_category='smart_name', mode='move', random_folder_name='_Random')
-    print(f"Word Sort result: {stats_word}")
-    assert stats_word['processed'] == 7
+    print(f"Meaningful Title Sort result: {stats_word}")
+    assert stats_word['processed'] == 8
 
-    # Verify amazon/ contains the two amazon files
-    amazon_dir = os.path.join(word_test_dir, "amazon")
-    assert os.path.isdir(amazon_dir), "amazon/ folder was not created"
-    assert os.path.exists(os.path.join(amazon_dir, "amazon_bill_123.pdf"))
-    assert os.path.exists(os.path.join(amazon_dir, "amazon_receipt_456.pdf"))
+    # Verify june_pearl/
+    assert os.path.isdir(os.path.join(word_test_dir, "june_pearl"))
+    assert os.path.exists(os.path.join(word_test_dir, "june_pearl", "_the_june_pearl_-12102022-0001.mp4"))
 
-    # Verify guru/ contains the two guru files
-    guru_dir = os.path.join(word_test_dir, "guru")
-    assert os.path.isdir(guru_dir), "guru/ folder was not created"
-    assert os.path.exists(os.path.join(guru_dir, "guru_notes.txt"))
-    assert os.path.exists(os.path.join(guru_dir, "guru_data.csv"))
+    # Verify silent_eyes/
+    assert os.path.isdir(os.path.join(word_test_dir, "silent_eyes"))
+    assert os.path.exists(os.path.join(word_test_dir, "silent_eyes", "the_silent_eyes_145-07062022-0001.mp4"))
+
+    # Verify document/
+    assert os.path.isdir(os.path.join(word_test_dir, "document"))
+    assert os.path.exists(os.path.join(word_test_dir, "document", "my_document_2024.pdf"))
+
+    # Verify nice_photo/
+    assert os.path.isdir(os.path.join(word_test_dir, "nice_photo"))
+    assert os.path.exists(os.path.join(word_test_dir, "nice_photo", "a_nice_photo.jpg"))
+
+    # Verify guru_finance_report/
+    assert os.path.isdir(os.path.join(word_test_dir, "guru_finance_report"))
+    assert os.path.exists(os.path.join(word_test_dir, "guru_finance_report", "guru_finance_report.xls"))
 
     # Verify _Random/ contains the three gibberish/no-word files
     random_dir = os.path.join(word_test_dir, "_Random")
@@ -124,7 +133,7 @@ def run_tests():
     assert os.path.exists(os.path.join(random_dir, "hfqgifcbkj9.png"))
     assert os.path.exists(os.path.join(random_dir, "323f9w8ehf8awjefi.docx"))
 
-    # Verify no per-hash folders exist
+    # Verify no single-file folders exist for random hashes
     assert not os.path.exists(os.path.join(word_test_dir, "336101256_21499"))
     assert not os.path.exists(os.path.join(word_test_dir, "hfqgifcbkj9"))
     assert not os.path.exists(os.path.join(word_test_dir, "323f9w8ehf8awjefi"))
@@ -136,7 +145,7 @@ def run_tests():
     if os.path.exists(test_dir):
         shutil.rmtree(test_dir)
 
-    print("\nSUCCESS: ALL SORTING, DUPLICATE, EMPTY FOLDER & WORD-BASED SORTING TESTS PASSED!")
+    print("\nSUCCESS: ALL SORTING, DUPLICATE, EMPTY FOLDER & MEANINGFUL GROUPING TESTS PASSED!")
 
 if __name__ == '__main__':
     run_tests()

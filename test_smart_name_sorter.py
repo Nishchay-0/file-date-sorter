@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from sorter_core import (
+    extract_meaningful_group,
     extract_word_base,
     is_random_or_hash_name,
     extract_clean_title_prefix,
@@ -23,14 +24,17 @@ class TestSmartNameSorter(unittest.TestCase):
 
     def test_01_word_base_extraction(self):
         """
-        Test 1 — Word base extraction:
-        Extracts first meaningful alphabetical word (3+ letters, >= 1 vowel).
+        Test 1 — Meaningful title & multi-word group extraction:
+        Extracts meaningful title group, skipping common leading stopwords ('the', 'a', 'my', etc.).
         """
         test_cases = {
-            "amazon_bill_123.pdf": "amazon",
-            "amazon_receipt_456.pdf": "amazon",
-            "guru_notes.txt": "guru",
-            "guru_data.csv": "guru",
+            "_the_june_pearl_-12102022-0001.mp4": "june_pearl",
+            "the_silent_eyes_145-07062022-0001.mp4": "silent_eyes",
+            "my_document_2024.pdf": "document",
+            "a_nice_photo.jpg": "nice_photo",
+            "guru_finance_report.xls": "guru_finance_report",
+            "amazon_bill_123.pdf": "amazon_bill",
+            "amazon_receipt_456.pdf": "amazon_receipt",
             "invoice_001.pdf": "invoice",
             "report-2026.pdf": "report",
             "336101256_21499.jpg": None,
@@ -40,53 +44,58 @@ class TestSmartNameSorter(unittest.TestCase):
             "5d41402abc4b2a76b9719d911017c592.jpg": None,
         }
         for fn, expected in test_cases.items():
-            word = extract_word_base(fn)
-            self.assertEqual(word, expected, f"Failed for {fn}: got {word}, expected {expected}")
+            group = extract_meaningful_group(fn)
+            self.assertEqual(group, expected, f"Failed for {fn}: got {group}, expected {expected}")
 
     def test_02_master_prompt_files_grouping(self):
         """
         Test 2 — Master Prompt Specification:
         Given:
-          - amazon_bill_123.pdf
-          - amazon_receipt_456.pdf
-          - guru_notes.txt
-          - guru_data.csv
-          - 336101256_21499.jpg
-          - hfqgifcbkj9.png
-          - 323f9w8ehf8awjefi.docx
-        Expected:
-          - amazon/ -> 2 amazon files
-          - guru/ -> 2 guru files
-          - _Random/ -> 3 gibberish/no-word files (ONE single random folder)
+          - _the_june_pearl_-12102022-0001.mp4 -> june_pearl/
+          - the_silent_eyes_145-07062022-0001.mp4 -> silent_eyes/
+          - my_document_2024.pdf -> document/
+          - a_nice_photo.jpg -> nice_photo/
+          - guru_finance_report.xls -> guru_finance_report/
+          - hfqgifcbkj9.png -> _Random/
+          - 323f9w8ehf8awjefi.docx -> _Random/
+          - 336101256_21499.jpg -> _Random/
         """
         files = [
-            "amazon_bill_123.pdf",
-            "amazon_receipt_456.pdf",
-            "guru_notes.txt",
-            "guru_data.csv",
-            "336101256_21499.jpg",
+            "_the_june_pearl_-12102022-0001.mp4",
+            "the_silent_eyes_145-07062022-0001.mp4",
+            "my_document_2024.pdf",
+            "a_nice_photo.jpg",
+            "guru_finance_report.xls",
             "hfqgifcbkj9.png",
-            "323f9w8ehf8awjefi.docx"
+            "323f9w8ehf8awjefi.docx",
+            "336101256_21499.jpg"
         ]
         for fn in files:
             with open(os.path.join(self.test_dir, fn), "w") as f:
                 f.write("content")
 
         stats, _ = organize_by_name(self.test_dir, dry_run=False, random_folder_name="_Random")
-        self.assertEqual(stats["processed"], 7)
+        self.assertEqual(stats["processed"], 8)
 
-        amazon_dir = os.path.join(self.test_dir, "amazon")
-        guru_dir = os.path.join(self.test_dir, "guru")
+        june_dir = os.path.join(self.test_dir, "june_pearl")
+        eyes_dir = os.path.join(self.test_dir, "silent_eyes")
+        doc_dir = os.path.join(self.test_dir, "document")
+        photo_dir = os.path.join(self.test_dir, "nice_photo")
+        guru_dir = os.path.join(self.test_dir, "guru_finance_report")
         random_dir = os.path.join(self.test_dir, "_Random")
 
-        self.assertTrue(os.path.isdir(amazon_dir))
+        self.assertTrue(os.path.isdir(june_dir))
+        self.assertTrue(os.path.isdir(eyes_dir))
+        self.assertTrue(os.path.isdir(doc_dir))
+        self.assertTrue(os.path.isdir(photo_dir))
         self.assertTrue(os.path.isdir(guru_dir))
         self.assertTrue(os.path.isdir(random_dir))
 
-        self.assertTrue(os.path.exists(os.path.join(amazon_dir, "amazon_bill_123.pdf")))
-        self.assertTrue(os.path.exists(os.path.join(amazon_dir, "amazon_receipt_456.pdf")))
-        self.assertTrue(os.path.exists(os.path.join(guru_dir, "guru_notes.txt")))
-        self.assertTrue(os.path.exists(os.path.join(guru_dir, "guru_data.csv")))
+        self.assertTrue(os.path.exists(os.path.join(june_dir, "_the_june_pearl_-12102022-0001.mp4")))
+        self.assertTrue(os.path.exists(os.path.join(eyes_dir, "the_silent_eyes_145-07062022-0001.mp4")))
+        self.assertTrue(os.path.exists(os.path.join(doc_dir, "my_document_2024.pdf")))
+        self.assertTrue(os.path.exists(os.path.join(photo_dir, "a_nice_photo.jpg")))
+        self.assertTrue(os.path.exists(os.path.join(guru_dir, "guru_finance_report.xls")))
         self.assertTrue(os.path.exists(os.path.join(random_dir, "336101256_21499.jpg")))
         self.assertTrue(os.path.exists(os.path.join(random_dir, "hfqgifcbkj9.png")))
         self.assertTrue(os.path.exists(os.path.join(random_dir, "323f9w8ehf8awjefi.docx")))
@@ -123,7 +132,7 @@ class TestSmartNameSorter(unittest.TestCase):
         """
         Test 4 — Dry run leaves disk untouched.
         """
-        fn = "amazon_bill.pdf"
+        fn = "my_document_2024.pdf"
         fp = os.path.join(self.test_dir, fn)
         with open(fp, "w") as f:
             f.write("test")
@@ -131,13 +140,13 @@ class TestSmartNameSorter(unittest.TestCase):
         stats, _ = organize_by_name(self.test_dir, dry_run=True)
         self.assertEqual(stats["processed"], 1)
         self.assertTrue(os.path.exists(fp))
-        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "amazon")))
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "document")))
 
     def test_05_preview_matches_execution(self):
         """
         Test 5 — Scan preview matches real destination.
         """
-        files = ["amazon_bill.pdf", "336101256_21499.jpg"]
+        files = ["my_document_2024.pdf", "336101256_21499.jpg"]
         for fn in files:
             with open(os.path.join(self.test_dir, fn), "w") as f:
                 f.write("content")
@@ -145,7 +154,7 @@ class TestSmartNameSorter(unittest.TestCase):
         preview, _, _ = scan_directory_preview(self.test_dir, sort_category="smart_name", random_folder_name="_Random")
         self.assertEqual(len(preview), 2)
         p_map = {p["filename"]: p["rel_target"] for p in preview}
-        self.assertEqual(p_map["amazon_bill.pdf"], "amazon")
+        self.assertEqual(p_map["my_document_2024.pdf"], "document")
         self.assertEqual(p_map["336101256_21499.jpg"], "_Random")
 
     def test_06_unsorted_subdivide_by_type(self):
@@ -174,20 +183,20 @@ class TestSmartNameSorter(unittest.TestCase):
         Test 7 — ISO date prefix renaming option:
         Renames file to YYYY-MM-DD_filename.ext on sort.
         """
-        fn = "amazon_receipt.pdf"
+        fn = "my_document_2024.pdf"
         with open(os.path.join(self.test_dir, fn), "w") as f:
             f.write("content")
 
         stats, _ = organize_by_name(self.test_dir, dry_run=False, iso_date_prefix=True)
         self.assertEqual(stats["processed"], 1)
 
-        amazon_dir = os.path.join(self.test_dir, "amazon")
-        self.assertTrue(os.path.isdir(amazon_dir))
-        entries = os.listdir(amazon_dir)
+        doc_dir = os.path.join(self.test_dir, "document")
+        self.assertTrue(os.path.isdir(doc_dir))
+        entries = os.listdir(doc_dir)
         self.assertEqual(len(entries), 1)
         # Should have YYYY-MM-DD_ prefix
-        self.assertTrue(entries[0].endswith("amazon_receipt.pdf"))
-        self.assertTrue(len(entries[0]) > len("amazon_receipt.pdf"))
+        self.assertTrue(entries[0].endswith("my_document_2024.pdf"))
+        self.assertTrue(len(entries[0]) > len("my_document_2024.pdf"))
 
     def test_08_generate_smart_name_plan(self):
         """
@@ -195,8 +204,8 @@ class TestSmartNameSorter(unittest.TestCase):
         Returns proposed folders, unsorted count, and review needed.
         """
         files = [
-            "amazon_bill.pdf",
-            "guru_notes.txt",
+            "my_document_2024.pdf",
+            "guru_finance_report.xls",
             "336101256_21499.jpg"
         ]
         for fn in files:
@@ -207,8 +216,8 @@ class TestSmartNameSorter(unittest.TestCase):
         self.assertEqual(plan["total_files"], 3)
         self.assertEqual(plan["unsorted_count"], 1)
         folder_names = [f["name"] for f in plan["proposed_folders"]]
-        self.assertIn("amazon", folder_names)
-        self.assertIn("guru", folder_names)
+        self.assertIn("document", folder_names)
+        self.assertIn("guru_finance_report", folder_names)
 
 
 if __name__ == "__main__":

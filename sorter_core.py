@@ -503,22 +503,29 @@ def strip_all_extensions(filename_or_basename):
 
 
 CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyz]{4,}', re.IGNORECASE)
+COMMON_STOPWORDS = {
+    'the', 'a', 'an', 'this', 'that', 'these', 'those',
+    'my', 'your', 'our', 'their', 'his', 'her', 'its'
+}
 
 
-def extract_word_base(filename):
+def extract_meaningful_group(filename):
     """
-    Extracts the first meaningful alphabetical word from a filename:
-    - Strips extension.
-    - Filters out machine hashes, pure numbers, UUIDs, and interleaved random strings.
-    - Finds the first contiguous alphabetical sequence of 3 or more letters with at least one vowel.
-    - Filters out consonant clusters (4+ consecutive consonants) and invalid vowel ratios.
-    - Returns the matched word (lowercased) if found, or None if no meaningful word is found.
+    Extracts the meaningful title / multi-word group from a filename:
+    - Strips extension and leading/trailing underscores/hyphens/spaces.
+    - Filters out machine hashes, pure numbers, UUIDs, Meta CDN IDs, and interleaved gibberish.
+    - Removes common leading stopwords ('the', 'a', 'an', 'my', 'your', etc.) to prevent false collisions.
+    - Preserves multi-word title prefixes before the first digit or date pattern.
+    - Returns clean underscore-joined title group (e.g. 'june_pearl', 'silent_eyes', 'document', 'guru_finance_report'),
+      or None if no meaningful alphabetic words exist.
 
     Examples:
-      'amazon_order_123.pdf' -> 'amazon'
-      'guru_finance_2024.xls' -> 'guru'
-      'invoice_001.pdf' -> 'invoice'
-      '336101256_21499838751079_308.jpg' -> None
+      '_the_june_pearl_-12102022-0001.mp4' -> 'june_pearl'
+      'the_silent_eyes_145-07062022-0001.mp4' -> 'silent_eyes'
+      'my_document_2024.pdf' -> 'document'
+      'a_nice_photo.jpg' -> 'nice_photo'
+      'guru_finance_report.xls' -> 'guru_finance_report'
+      '336101256_21499.jpg' -> None
       'hfqgifcbkj9.png' -> None
       '323f9w8ehf8awjefi.docx' -> None
     """
@@ -526,6 +533,7 @@ def extract_word_base(filename):
         return None
 
     stem = strip_all_extensions(filename).strip()
+    stem = stem.strip(' _-.')
     if not stem:
         return None
 
@@ -553,17 +561,36 @@ def extract_word_base(filename):
     if re.search(r'\d+[a-zA-Z]\d+|\d+[a-zA-Z]{1,2}\d+', stem):
         return None
 
-    # Multi-digit numeric ID sequences with separators (12+ digits with no word letters)
+    # Multi-digit numeric ID sequences with separators (10+ digits with no word letters)
     clean_no_sep = re.sub(r'[_\-\.\s]', '', stem)
     if clean_no_sep.isdigit() and len(clean_no_sep) >= 10:
         return None
 
-    # Find alphabetical word sequences of 3+ letters
-    tokens = re.findall(r'[a-zA-Z]+', stem)
-    for token in tokens:
-        if len(token) < 3:
-            continue
-        t = token.lower()
+    # Extract alphabetical/underscore prefix before the first digit or date pattern
+    m = re.match(r'^([a-zA-Z\s_\-]+?)(?=[0-9]|$)', stem)
+    if not m:
+        return None
+
+    prefix = m.group(1).strip(' _-.')
+    if not prefix:
+        return None
+
+    # Tokenize prefix into alphabetical words
+    raw_tokens = re.findall(r'[a-zA-Z]+', prefix)
+    if not raw_tokens:
+        return None
+
+    # If first token is a common stopword, remove it and use remaining tokens
+    if raw_tokens[0].lower() in COMMON_STOPWORDS:
+        if len(raw_tokens) > 1:
+            raw_tokens = raw_tokens[1:]
+        else:
+            return None
+
+    # Filter valid tokens (must contain vowel, not consonant cluster, >= 2 chars)
+    valid_tokens = []
+    for tok in raw_tokens:
+        t = tok.lower()
         vowels = sum(1 for c in t if c in 'aeiou')
         if vowels == 0:
             continue
@@ -573,28 +600,39 @@ def extract_word_base(filename):
         # Minimum vowel ratio (at least 20% vowels)
         if (vowels / len(t)) < 0.20:
             continue
-        return t
+        if len(t) < 2:
+            continue
+        valid_tokens.append(t)
 
-    return None
+    if not valid_tokens:
+        return None
+
+    return '_'.join(valid_tokens)
+
+
+# Backward compatibility alias
+def extract_word_base(filename):
+    """Alias to extract_meaningful_group."""
+    return extract_meaningful_group(filename)
 
 
 def is_random_or_hash_name(filename_or_basename):
     """
-    Checks if a filename lacks a meaningful alphabetical word base.
+    Checks if a filename lacks a meaningful alphabetical word or title group.
     Returns (is_random: bool, reason: str).
     """
-    word = extract_word_base(filename_or_basename)
-    if word:
-        return False, f"Meaningful word base '{word}' found"
+    group = extract_meaningful_group(filename_or_basename)
+    if group:
+        return False, f"Meaningful title group '{group}' found"
     return True, "No meaningful word found in filename"
 
 
 def extract_clean_title_prefix(filename_or_basename):
     """
-    Returns the first extracted word base for a filename, or empty string.
+    Returns the extracted meaningful title group for a filename, or empty string.
     """
-    word = extract_word_base(filename_or_basename)
-    return word if word else ""
+    group = extract_meaningful_group(filename_or_basename)
+    return group if group else ""
 
 
 # File category buckets used for Unsorted subdivision
@@ -633,16 +671,16 @@ def get_unsorted_subfolder(filepath, subdivide='none'):
 
 def get_name_sort_folder(filename, random_folder_name="_Random", filepath=None, unsorted_subdivide='none'):
     """
-    Computes destination subfolder for Word-Based Name Matching:
-      - Extracts the first meaningful alphabetical word (e.g. 'amazon', 'guru', 'invoice').
-      - If found: routes to folder named after the word.
-      - If no meaningful word found: routes to ONE shared catch-all folder (default: '_Random'),
+    Computes destination subfolder for Meaningful Title & Multi-Word Grouping:
+      - Extracts meaningful multi-word title group skipping stopwords (e.g. 'june_pearl', 'silent_eyes', 'document').
+      - If found: routes to folder named after the group.
+      - If no meaningful title group found: routes to ONE shared catch-all folder (default: '_Random'),
         optionally subdivided by type or date via unsorted_subdivide.
     Returns (folder_name: str, is_random: bool, reason: str).
     """
-    word = extract_word_base(filename)
-    if word:
-        return word, False, f"Extracted word base '{word}'"
+    group = extract_meaningful_group(filename)
+    if group:
+        return group, False, f"Extracted title group '{group}'"
 
     base_name = random_folder_name if (random_folder_name and str(random_folder_name).strip()) else "_Random"
     if unsorted_subdivide and unsorted_subdivide != 'none' and filepath:
