@@ -5051,8 +5051,10 @@ if HAS_CUSTOMTKINTER:
                 return "category"
             elif "Extension" in raw:
                 return "extension"
-            elif "Name" in raw:
-                return "name"
+            elif "Alphabetical" in raw:
+                return "alphabetical"
+            elif "Smart" in raw or "Name" in raw:
+                return "smart_name"
             elif "Size" in raw:
                 return "size"
             return "date"

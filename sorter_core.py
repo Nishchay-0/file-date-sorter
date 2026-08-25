@@ -8,6 +8,7 @@ import hashlib
 import zipfile
 import ctypes
 import re
+import math
 import time
 import threading
 import difflib
@@ -467,6 +468,117 @@ def format_bytes(size):
     return f"{size:.1f} PB"
 
 
+UUID_REGEX = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+HEX_HASH_REGEX = re.compile(r'^[0-9a-fA-F]{12,}$')
+CONSONANT_CLUSTER_REGEX = re.compile(r'[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{4,}')
+COMMON_HUMAN_WORD_ROOTS = {
+    'image', 'photo', 'picture', 'screenshot', 'screen', 'video', 'vid',
+    'doc', 'document', 'scan', 'recording', 'audio', 'track', 'song',
+    'file', 'report', 'backup', 'copy', 'final', 'draft', 'test', 'data',
+    'invoice', 'resume', 'note', 'notes', 'paper', 'project', 'presentation',
+    'movie', 'clip', 'music', 'sound', 'chapter', 'part', 'page', 'sample'
+}
+
+
+def is_random_or_hash_name(filename_or_basename):
+    """
+    Detects if a filename is machine-generated / random hash vs a human-named file.
+    Returns (is_random: bool, reason: str).
+
+    Heuristics:
+      1. UUID / GUID formats -> Random
+      2. Pure hexadecimal hashes (MD5, SHA1, SHA256) of length >= 12 -> Random
+      3. Length >= 10 with NO separators ('_', '-', ' ', '.') and mixed letters+digits,
+         no dictionary words, and abnormal consonant clusters (>4 consonants) or high entropy -> Random
+      4. Structured names (with separators or recognizable human words) -> Human Named
+    """
+    if not filename_or_basename:
+        return False, "Empty filename"
+
+    base_name = os.path.splitext(os.path.basename(filename_or_basename))[0].strip()
+    if not base_name:
+        return False, "Empty base filename"
+
+    # 1. UUID Check
+    if UUID_REGEX.match(base_name):
+        return True, f"UUID machine-generated identifier ('{base_name}')"
+
+    # 2. Pure Hexadecimal Hash (e.g. MD5, SHA1, SHA256, Git commit hashes >= 12 chars)
+    if HEX_HASH_REGEX.match(base_name):
+        return True, f"Hexadecimal hash ({len(base_name)} hex chars, e.g. MD5/SHA) ('{base_name}')"
+
+    # 3. Separator Check: Names with '_', '-', ' ', '.' usually indicate human structured naming
+    has_separator = any(sep in base_name for sep in ('_', '-', ' ', '.'))
+
+    if has_separator:
+        return False, f"Structured human name with separators ('{base_name}')"
+
+    # 4. Length check: random strings are typically >= 10 chars without separators
+    name_len = len(base_name)
+    if name_len < 10:
+        return False, f"Short name (<10 chars) ('{base_name}')"
+
+    # Check for presence of common human word roots
+    base_lower = base_name.lower()
+    for root in COMMON_HUMAN_WORD_ROOTS:
+        if root in base_lower:
+            return False, f"Contains human word root '{root}' ('{base_name}')"
+
+    # Check if purely alphabetic human-like word vs mixed alphanumeric
+    has_digits = any(c.isdigit() for c in base_name)
+    has_letters = any(c.isalpha() for c in base_name)
+
+    # 5. Mixed alphanumeric without separators
+    if has_digits and has_letters:
+        vowels = set('aeiouAEIOU')
+        vowel_count = sum(1 for c in base_name if c in vowels)
+        vowel_ratio = vowel_count / float(name_len)
+        consonant_cluster = CONSONANT_CLUSTER_REGEX.search(base_name)
+
+        char_counts = {}
+        for c in base_name:
+            char_counts[c] = char_counts.get(c, 0) + 1
+        entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
+
+        if consonant_cluster:
+            cluster_text = consonant_cluster.group(0)
+            return True, f"Random machine-generated name: {name_len} chars, mixed alphanumeric, consonant cluster '{cluster_text}' (entropy: {entropy:.2f})"
+
+        if vowel_ratio < 0.18 or vowel_ratio > 0.80 or entropy > 2.9:
+            return True, f"Random machine-generated name: {name_len} chars, mixed alphanumeric with abnormal vowel ratio {vowel_ratio:.1%} (entropy: {entropy:.2f})"
+
+    # 6. High entropy string of length >= 12 with consonant cluster
+    if name_len >= 12:
+        char_counts = {}
+        for c in base_name:
+            char_counts[c] = char_counts.get(c, 0) + 1
+        entropy = -sum((cnt / name_len) * math.log2(cnt / name_len) for cnt in char_counts.values())
+
+        consonant_cluster = CONSONANT_CLUSTER_REGEX.search(base_name)
+        if consonant_cluster and entropy > 2.8:
+            return True, f"Random string: {name_len} chars, high entropy {entropy:.2f}, consonant cluster '{consonant_cluster.group(0)}'"
+
+    return False, f"Regular human name ('{base_name}')"
+
+
+def get_name_sort_folder(filename, random_folder_name="Unsorted"):
+    """
+    Computes destination subfolder for Smart Full-Name Matching mode:
+      - If filename is flagged as machine-generated/hash-like: routes to single catch-all folder (e.g. 'Unsorted').
+      - Otherwise: routes to exact full base name (e.g. 'ansh_true' -> 'ansh_true/').
+    Returns (folder_name: str, is_random: bool, reason: str).
+    """
+    base_name = os.path.splitext(os.path.basename(filename))[0].strip()
+    is_random, reason = is_random_or_hash_name(filename)
+
+    if is_random:
+        folder_name = random_folder_name if (random_folder_name and str(random_folder_name).strip()) else "Unsorted"
+    else:
+        folder_name = base_name if base_name else "Unnamed"
+
+    return folder_name, is_random, reason
+
+
 def get_alphabetical_folder(filename):
     """Returns A-Z, 0-9, or Symbols folder name based on first letter."""
     name = filename.strip()
@@ -481,7 +593,7 @@ def get_alphabetical_folder(filename):
         return "Symbols & Others"
 
 
-def get_destination_folder(base_folder, filepath, sort_category, date_source='ctime', structure_format='YYYY/MM', is_duplicate=False, isolate_duplicates=False, dest_folder=None):
+def get_destination_folder(base_folder, filepath, sort_category, date_source='ctime', structure_format='YYYY/MM', is_duplicate=False, isolate_duplicates=False, dest_folder=None, random_folder_name="Unsorted"):
     """
     Generates target folder path depending on sort_category & optional custom dest_folder.
     """
@@ -518,7 +630,11 @@ def get_destination_folder(base_folder, filepath, sort_category, date_source='ct
         ext_folder = ext.upper() if ext else "NO_EXT"
         return os.path.join(target_root, ext_folder)
 
-    elif sort_category == 'name':
+    elif sort_category in ('smart_name', 'name', 'full_name'):
+        folder_name, is_random, reason = get_name_sort_folder(filename, random_folder_name=random_folder_name)
+        return os.path.join(target_root, folder_name)
+
+    elif sort_category == 'alphabetical':
         alpha_folder = get_alphabetical_folder(filename)
         return os.path.join(target_root, f"Alphabetical_{alpha_folder}")
 
@@ -1458,7 +1574,8 @@ def scan_directory_preview(
     exclude_files=None,
     isolate_duplicates=False,
     dest_folder=None,
-    selected_files=None
+    selected_files=None,
+    random_folder_name="Unsorted"
 ):
     """
     Generates a full preview array of proposed file moves, stats, and duplicate analysis.
@@ -1503,7 +1620,7 @@ def scan_directory_preview(
 
         is_dup = fp in duplicates
         target_dir = get_destination_folder(
-            base_dir, fp, sort_category, date_source, structure_format, is_dup, isolate_duplicates, dest_folder=dest_folder
+            base_dir, fp, sort_category, date_source, structure_format, is_dup, isolate_duplicates, dest_folder=dest_folder, random_folder_name=random_folder_name
         )
         target_path = os.path.join(target_dir, filename)
         rel_target = os.path.relpath(target_dir, target_base)
@@ -1511,6 +1628,8 @@ def scan_directory_preview(
         status_str = "DUPLICATE" if is_dup else "Ready"
         if os.path.exists(fix_win_long_path(target_path)) and os.path.abspath(os.path.dirname(fp)) != os.path.abspath(target_dir):
             status_str = "WILL SKIP (Target Exists)"
+
+        is_rand, rand_reason = is_random_or_hash_name(filename)
 
         preview_items.append({
             "filename": filename,
@@ -1523,7 +1642,9 @@ def scan_directory_preview(
             "size_str": format_bytes(sz),
             "size_bytes": sz,
             "is_duplicate": is_dup,
-            "status_str": status_str
+            "status_str": status_str,
+            "is_random": is_rand,
+            "classification_reason": rand_reason
         })
 
     summary = {
@@ -1769,10 +1890,11 @@ def organize_directory(
     progress_callback=None,
     selected_files=None,
     skipped_handling='stay',
-    skipped_dest_folder=None
+    skipped_dest_folder=None,
+    random_folder_name="Unsorted"
 ):
     """
-    Scans and organizes files safely. Supports selected_files list.
+    Scans and organizes files safely. Supports selected_files list and smart_name matching.
     """
     if not selected_files:
         main_folder = os.path.abspath(main_folder) if main_folder else None
@@ -1835,7 +1957,7 @@ def organize_directory(
 
             is_dup = file_path in duplicates
             target_dir = get_destination_folder(
-                base_folder, file_path, sort_category, date_source, structure_format, is_dup, isolate_duplicates, dest_folder=dest_folder
+                base_folder, file_path, sort_category, date_source, structure_format, is_dup, isolate_duplicates, dest_folder=dest_folder, random_folder_name=random_folder_name
             )
             filename = os.path.basename(file_path)
 
@@ -1977,6 +2099,44 @@ def organize_directory(
             stats['manifest_error'] = str(e)
 
     return stats, manifest_data
+
+
+def organize_by_name(
+    folder,
+    dest_folder=None,
+    dry_run=True,
+    random_folder_name="Unsorted",
+    mode='move',
+    on_conflict='number',
+    selected_files=None,
+    recursive=True,
+    exclude_folders=None,
+    exclude_files=None,
+    progress_callback=None
+):
+    """
+    Dedicated high-performance Smart Name Sorter:
+      1. Exact full-name matching (minus extension) — no prefix truncation.
+         'ansh_true.jpg' -> 'ansh_true/' and 'ansh_rao.png' -> 'ansh_rao/'.
+      2. Heuristic random / machine-generated / hash detection.
+      3. All random files routed to ONE shared catch-all folder (e.g. 'Unsorted').
+      4. Preserves original casing for folder names.
+      5. Dry-run support by default, safe non-overwriting collision handling, and full audit logging.
+    """
+    return organize_directory(
+        main_folder=folder,
+        sort_category='smart_name',
+        recursive=recursive,
+        exclude_folders=exclude_folders,
+        exclude_files=exclude_files,
+        mode=mode,
+        dry_run=dry_run,
+        dest_folder=dest_folder,
+        on_conflict=on_conflict,
+        selected_files=selected_files,
+        random_folder_name=random_folder_name,
+        progress_callback=progress_callback
+    )
 
 
 def list_manifest_files(main_folder=None):

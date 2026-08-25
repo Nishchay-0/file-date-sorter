@@ -151,9 +151,10 @@ def setup_organizer_tab(gui_instance):
         variable=gui_instance.sort_category_var,
         values=[
             "📅 Date (Creation / Mod / EXIF)",
+            "🎯 Smart Full Name (Auto-Catch Random/Hashes)",
             "📁 File Category (Images, Docs...)",
             "🏷️ Extension (PDF, PNG, DOCX...)",
-            "🔤 File Name (Alphabetical A-Z)",
+            "🔤 Alphabetical (A-Z)",
             "⚖️ File Size (<1MB, >100MB...)"
         ],
         command=gui_instance.on_category_changed,

@@ -36,9 +36,15 @@ def main():
     )
     parser.add_argument(
         "-c", "--sort-category",
-        choices=["date", "category", "extension", "name", "size"],
+        choices=["date", "category", "extension", "name", "smart_name", "full_name", "alphabetical", "size"],
         default="date",
-        help="Sorting criteria: 'date' (Year/Month), 'category' (Images/Docs/Videos), 'extension' (PDF/PNG), 'name' (Alphabetical A-Z), 'size' (File Size)."
+        help="Sorting criteria: 'date' (Year/Month), 'category' (Images/Docs/Videos), 'extension' (PDF/PNG), 'smart_name' / 'name' (Full Name with Random Detection), 'alphabetical' (A-Z), 'size' (File Size)."
+    )
+    parser.add_argument(
+        "--random-folder",
+        type=str,
+        default="Unsorted",
+        help="Catch-all folder name for machine-generated / random hash filenames when using smart_name sorting (default: 'Unsorted')."
     )
     parser.add_argument(
         "-r", "--recursive",
@@ -227,7 +233,8 @@ def main():
             mode=args.mode,
             dry_run=args.dry_run,
             clean_empty=args.clean_empty,
-            progress_callback=print_progress
+            progress_callback=print_progress,
+            random_folder_name=args.random_folder
         )
 
         print("\n=== SORTING COMPLETE ===")
