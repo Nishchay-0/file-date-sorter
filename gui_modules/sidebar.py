@@ -96,7 +96,7 @@ class LeftSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
         self.btn_container.pack(fill="both", expand=True, padx=4, pady=(0, 6))
         self.btn_container.grid_columnconfigure(0, weight=1)
         if HAS_COMPONENTS:
-            enhance_scrollable_frame_speed(self.btn_container)
+            enhance_scrollable_frame_speed(self.btn_container, step_multiplier=24)
 
         for idx, tool in enumerate(TOOLS):
             btn = ctk.CTkButton(

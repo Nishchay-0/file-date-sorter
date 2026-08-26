@@ -503,11 +503,11 @@ class Windows11ConflictDialog(_BaseToplevel):
         self.destroy()
 
 
-def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=12):
+def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=24):
     """
-    Boosts mouse wheel scrolling speed on CTkScrollableFrame to ultra-high velocity (12x).
+    Boosts mouse wheel scrolling speed on CTkScrollableFrame to ultra-high velocity (24x).
     Recursively attaches accelerated scroll handlers to the scroll container, canvas,
-    and all descendant child widgets, ensuring buttery-smooth and lightning-fast scrolling.
+    and all descendant child widgets, ensuring lightning-fast and responsive scrolling.
     """
     if not hasattr(scroll_frame, "_parent_canvas"):
         return scroll_frame
@@ -530,7 +530,7 @@ def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=12):
         except Exception:
             pass
 
-    # Override instance-level handlers so mouse wheel over any nested child widget also scrolls at 12x speed
+    # Override instance-level handlers so mouse wheel over any nested child widget also scrolls at 24x speed
     try:
         scroll_frame._mouse_wheel_all = _fast_scroll
         scroll_frame._mouse_wheel = _fast_scroll
@@ -558,5 +558,89 @@ def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=12):
         pass
 
     return scroll_frame
+
+
+def enhance_treeview_scroll_speed(tree, step=6):
+    """
+    Boosts mouse wheel scrolling speed on ttk.Treeview tables.
+    Scrolls step (e.g. 5-8) rows per wheel tick instead of the sluggish 1 row.
+    """
+    def _fast_tree_scroll(event):
+        try:
+            if sys.platform.startswith("win") or sys.platform.startswith("darwin"):
+                if event.delta:
+                    direction = -1 if event.delta > 0 else 1
+                    ticks = max(1, abs(int(event.delta / 120))) if abs(event.delta) >= 120 else 1
+                    tree.yview_scroll(direction * ticks * step, "units")
+                    return "break"
+            elif event.num == 4:
+                tree.yview_scroll(-step, "units")
+                return "break"
+            elif event.num == 5:
+                tree.yview_scroll(step, "units")
+                return "break"
+        except Exception:
+            pass
+
+    try:
+        tree.bind("<MouseWheel>", _fast_tree_scroll)
+        tree.bind("<Button-4>", _fast_tree_scroll)
+        tree.bind("<Button-5>", _fast_tree_scroll)
+    except Exception:
+        pass
+    return tree
+
+
+def enhance_textbox_scroll_speed(textbox, step=6):
+    """
+    Boosts mouse wheel scrolling speed on CTkTextbox widgets.
+    Scrolls step (e.g. 5-8) lines per wheel tick.
+    """
+    tb = getattr(textbox, "_textbox", textbox)
+    def _fast_tb_scroll(event):
+        try:
+            if sys.platform.startswith("win") or sys.platform.startswith("darwin"):
+                if event.delta:
+                    direction = -1 if event.delta > 0 else 1
+                    ticks = max(1, abs(int(event.delta / 120))) if abs(event.delta) >= 120 else 1
+                    tb.yview_scroll(direction * ticks * step, "units")
+                    return "break"
+            elif event.num == 4:
+                tb.yview_scroll(-step, "units")
+                return "break"
+            elif event.num == 5:
+                tb.yview_scroll(step, "units")
+                return "break"
+        except Exception:
+            pass
+
+    try:
+        tb.bind("<MouseWheel>", _fast_tb_scroll)
+        tb.bind("<Button-4>", _fast_tb_scroll)
+        tb.bind("<Button-5>", _fast_tb_scroll)
+    except Exception:
+        pass
+    return textbox
+
+
+def boost_all_scroll_widgets(container, frame_multiplier=24, tree_step=6, text_step=6):
+    """
+    Recursively finds and accelerates every CTkScrollableFrame, ttk.Treeview,
+    and CTkTextbox inside the specified container.
+    """
+    if not container:
+        return
+    try:
+        if HAS_CUSTOMTKINTER and isinstance(container, ctk.CTkScrollableFrame):
+            enhance_scrollable_frame_speed(container, step_multiplier=frame_multiplier)
+        elif isinstance(container, ttk.Treeview):
+            enhance_treeview_scroll_speed(container, step=tree_step)
+        elif HAS_CUSTOMTKINTER and isinstance(container, ctk.CTkTextbox):
+            enhance_textbox_scroll_speed(container, step=text_step)
+
+        for child in container.winfo_children():
+            boost_all_scroll_widgets(child, frame_multiplier, tree_step, text_step)
+    except Exception:
+        pass
 
 

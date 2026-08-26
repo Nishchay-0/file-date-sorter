@@ -22,7 +22,10 @@ from gui_modules.components import (
     get_user_folder,
     Windows11ConflictDialog,
     GRANULAR_FILE_TYPES,
-    enhance_scrollable_frame_speed
+    enhance_scrollable_frame_speed,
+    enhance_treeview_scroll_speed,
+    enhance_textbox_scroll_speed,
+    boost_all_scroll_widgets
 )
 
 from gui_modules.views.tab_sorter import setup_organizer_tab
@@ -641,9 +644,13 @@ if HAS_CUSTOMTKINTER:
                         except Exception:
                             pass
                     
-                    # If widget is a CTkScrollableFrame, apply fast mouse wheel scrolling speed
+                    # If widget is a CTkScrollableFrame, apply fast mouse wheel scrolling speed (24x)
                     if isinstance(widget, ctk.CTkScrollableFrame):
-                        enhance_scrollable_frame_speed(widget)
+                        enhance_scrollable_frame_speed(widget, step_multiplier=24)
+                    elif isinstance(widget, ttk.Treeview):
+                        enhance_treeview_scroll_speed(widget, step=6)
+                    elif isinstance(widget, ctk.CTkTextbox):
+                        enhance_textbox_scroll_speed(widget, step=6)
 
                     for child in widget.winfo_children():
                         _atomic_repaint_recursive(child)
