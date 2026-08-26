@@ -503,17 +503,18 @@ class Windows11ConflictDialog(_BaseToplevel):
         self.destroy()
 
 
-def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=3):
+def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=6):
     """
     Boosts mouse wheel scrolling speed on CTkScrollableFrame.
-    Scrolls step_multiplier units (e.g. 3-4 units) per wheel tick instead of the default 1 unit,
-    providing lightning-fast, smooth scrolling across the entire UI.
+    Scrolls step_multiplier units (e.g. 6-8 units) per wheel tick instead of the default 1 unit,
+    providing lightning-fast, buttery-smooth scrolling across the entire UI regardless of
+    whether the cursor is over the canvas, background, or child widgets.
     """
     if not hasattr(scroll_frame, "_parent_canvas"):
         return scroll_frame
     canvas = scroll_frame._parent_canvas
 
-    def _fast_mousewheel(event):
+    def _fast_scroll(event):
         try:
             if sys.platform.startswith("win") or sys.platform.startswith("darwin"):
                 if event.delta:
@@ -530,10 +531,18 @@ def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=3):
         except Exception:
             pass
 
+    # Override instance-level handlers so mouse wheel over any nested child widget also scrolls at 6x speed
     try:
-        canvas.bind("<MouseWheel>", _fast_mousewheel, add="+")
-        canvas.bind("<Button-4>", _fast_mousewheel, add="+")
-        canvas.bind("<Button-5>", _fast_mousewheel, add="+")
+        scroll_frame._mouse_wheel_all = _fast_scroll
+        scroll_frame._mouse_wheel = _fast_scroll
+    except Exception:
+        pass
+
+    try:
+        canvas.bind("<MouseWheel>", _fast_scroll, add="+")
+        canvas.bind("<Button-4>", _fast_scroll, add="+")
+        canvas.bind("<Button-5>", _fast_scroll, add="+")
     except Exception:
         pass
     return scroll_frame
+
