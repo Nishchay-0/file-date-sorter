@@ -503,12 +503,11 @@ class Windows11ConflictDialog(_BaseToplevel):
         self.destroy()
 
 
-def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=6):
+def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=12):
     """
-    Boosts mouse wheel scrolling speed on CTkScrollableFrame.
-    Scrolls step_multiplier units (e.g. 6-8 units) per wheel tick instead of the default 1 unit,
-    providing lightning-fast, buttery-smooth scrolling across the entire UI regardless of
-    whether the cursor is over the canvas, background, or child widgets.
+    Boosts mouse wheel scrolling speed on CTkScrollableFrame to ultra-high velocity (12x).
+    Recursively attaches accelerated scroll handlers to the scroll container, canvas,
+    and all descendant child widgets, ensuring buttery-smooth and lightning-fast scrolling.
     """
     if not hasattr(scroll_frame, "_parent_canvas"):
         return scroll_frame
@@ -531,18 +530,33 @@ def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=6):
         except Exception:
             pass
 
-    # Override instance-level handlers so mouse wheel over any nested child widget also scrolls at 6x speed
+    # Override instance-level handlers so mouse wheel over any nested child widget also scrolls at 12x speed
     try:
         scroll_frame._mouse_wheel_all = _fast_scroll
         scroll_frame._mouse_wheel = _fast_scroll
     except Exception:
         pass
 
+    # Recursively bind fast scroll on scroll frame, canvas, and all children
+    def _bind_recursive(w):
+        try:
+            w.bind("<MouseWheel>", _fast_scroll)
+            w.bind("<Button-4>", _fast_scroll)
+            w.bind("<Button-5>", _fast_scroll)
+        except Exception:
+            pass
+        try:
+            for child in w.winfo_children():
+                _bind_recursive(child)
+        except Exception:
+            pass
+
     try:
-        canvas.bind("<MouseWheel>", _fast_scroll, add="+")
-        canvas.bind("<Button-4>", _fast_scroll, add="+")
-        canvas.bind("<Button-5>", _fast_scroll, add="+")
+        _bind_recursive(scroll_frame)
+        _bind_recursive(canvas)
     except Exception:
         pass
+
     return scroll_frame
+
 
