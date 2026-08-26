@@ -65,7 +65,8 @@ from sorter_core import (
     run_converter_batch,
     get_system_vault_dir,
     gather_files,
-    count_cloud_placeholders
+    count_cloud_placeholders,
+    natural_sort_key
 )
 
 try:
@@ -4871,23 +4872,28 @@ if HAS_CUSTOMTKINTER:
             self.refresh_preview()
 
         def _on_theme_seg_changed(self, value):
-            """Handle segmented theme toggle (Dark / Light)."""
-            if "Dark" in value:
-                ctk.set_appearance_mode("Dark")
+            """Handle segmented theme toggle (Dark / Light) with dynamic Treeview glass restyling."""
+            mode = "dark" if "Dark" in value else "light"
+            if HAS_THEME:
+                apply_glass_theme(mode)
             else:
-                ctk.set_appearance_mode("Light")
+                ctk.set_appearance_mode(mode.capitalize())
 
         def toggle_theme(self):
             """Legacy toggle_theme kept for backward compatibility."""
             mode = ctk.get_appearance_mode()
             if mode == "Dark":
-                ctk.set_appearance_mode("Light")
+                new_mode = "light"
                 if hasattr(self, 'theme_seg'):
                     self.theme_seg.set("☀️ Light")
             else:
-                ctk.set_appearance_mode("Dark")
+                new_mode = "dark"
                 if hasattr(self, 'theme_seg'):
                     self.theme_seg.set("🌙 Dark")
+            if HAS_THEME:
+                apply_glass_theme(new_mode)
+            else:
+                ctk.set_appearance_mode(new_mode.capitalize())
 
         def _start_status_pulse(self):
             """Animate a subtle pulsing dot in the status bar when idle."""
@@ -5701,13 +5707,44 @@ if HAS_CUSTOMTKINTER:
             self._on_large_select()
 
         def _sort_tree(self, tree, col):
+            """Sorts treeview rows by column with ascending/descending toggle and direction indicators (▲/▼)."""
+            if not hasattr(self, '_tree_sort_states'):
+                self._tree_sort_states = {}
+            tree_id = str(id(tree))
+            if tree_id not in self._tree_sort_states:
+                self._tree_sort_states[tree_id] = {}
+
+            reverse = self._tree_sort_states[tree_id].get(col, False)
+            self._tree_sort_states[tree_id][col] = not reverse
+
             data = [(tree.set(item, col), item) for item in tree.get_children("")]
             try:
-                data.sort(key=lambda x: float(x[0].replace(",", "").split()[0]) if x[0].replace(",", "").split()[0].replace(".", "").isdigit() else x[0].lower())
+                def _sort_val(v):
+                    v_clean = str(v).replace(",", "").strip()
+                    parts = v_clean.split()
+                    if parts and parts[0].replace(".", "").isdigit():
+                        return float(parts[0])
+                    return natural_sort_key(v_clean.lower())
+                data.sort(key=lambda x: _sort_val(x[0]), reverse=reverse)
             except Exception:
-                data.sort(key=lambda x: x[0].lower())
+                data.sort(key=lambda x: str(x[0]).lower(), reverse=reverse)
+
             for idx, (val, item) in enumerate(data):
                 tree.move(item, "", idx)
+
+            # Update column header with ▲ / ▼ direction indicator
+            arrow = " ▼" if reverse else " ▲"
+            try:
+                cols = tree["columns"]
+                for c in cols:
+                    hdr_text = tree.heading(c, "text")
+                    clean_text = hdr_text.replace(" ▲", "").replace(" ▼", "")
+                    if c == col:
+                        tree.heading(c, text=clean_text + arrow)
+                    else:
+                        tree.heading(c, text=clean_text)
+            except Exception:
+                pass
 
         def move_selected_large_files(self):
             selected = self.large_tree.selection()

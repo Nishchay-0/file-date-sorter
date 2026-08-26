@@ -45,12 +45,15 @@ GLASS = {
     "text_secondary":  ("#8E8E93", "#98989D"),
     "text_hint":       ("#AEAEB2", "#636366"),
 
-    # Borders
-    "border":          ("#C6C6C8", "#38383A"),
+    # Borders & Shadows
+    "border":          ("#D1D1D6", "#38383A"),
     "border_accent":   ("#007AFF", "#0A84FF"),
+    "shadow":          ("rgba(0,0,0,0.06)", "rgba(0,0,0,0.3)"),
+    "hover_bg":        ("#E8E8ED", "#38383A"),
+    "selected_bg":     ("#D1D1D6", "#48484A"),
 
     # Corner radii
-    "r_window":  0,
+    "r_window":  16,
     "r_card":    16,
     "r_button":  10,
     "r_entry":   8,
@@ -136,6 +139,14 @@ def accent_button(parent, text, command=None, accent="blue", width=120, height=3
                         font=font or FONTS["body"](), **kw)
     _attach_hover_pulse(btn)
     return btn
+
+
+def primary_button(parent, text, command=None, accent="blue", width=120, height=32,
+                   icon="", corner_radius=None, font=None, **kw):
+    """Primary action button with solid accent background and hover pulse."""
+    return accent_button(parent, text, command=command, accent=accent, width=width,
+                         height=height, icon=icon, corner_radius=corner_radius,
+                         font=font, **kw)
 
 
 def secondary_button(parent, text, command=None, width=110, height=30, icon="", **kw):
@@ -227,6 +238,63 @@ DARK_THEME = {
 }
 
 
+def configure_treeview_glass_style(mode: str = "dark"):
+    """
+    Configures ttk.Treeview with modern Apple Big Sur glass styling:
+    comfortable row heights (28px), subtle borders, clean headers,
+    and adaptive light/dark mode palettes.
+    """
+    try:
+        import tkinter.ttk as ttk
+        style = ttk.Style()
+        is_dark = str(mode).lower() == "dark"
+
+        # Colors matching Apple Big Sur glass tokens
+        bg_card = "#242426" if is_dark else "#FFFFFF"
+        fg_text = "#F2F2F7" if is_dark else "#1C1C1E"
+        bg_hdr  = "#2C2C2E" if is_dark else "#E5E5EA"
+        fg_hdr  = "#F2F2F7" if is_dark else "#1C1C1E"
+        sel_bg  = "#0A84FF" if is_dark else "#007AFF"
+        sel_fg  = "#FFFFFF"
+
+        # Apply to default clam theme for custom coloring
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+
+        style.configure(
+            "Treeview",
+            background=bg_card,
+            foreground=fg_text,
+            fieldbackground=bg_card,
+            rowheight=28,
+            font=("Segoe UI", 10),
+            borderwidth=0,
+            relief="flat"
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", sel_bg)],
+            foreground=[("selected", sel_fg)]
+        )
+        style.configure(
+            "Treeview.Heading",
+            background=bg_hdr,
+            foreground=fg_hdr,
+            font=("Segoe UI", 10, "bold"),
+            relief="flat",
+            padding=(6, 4)
+        )
+        style.map(
+            "Treeview.Heading",
+            background=[("active", sel_bg), ("pressed", sel_bg)],
+            foreground=[("active", "#FFFFFF"), ("pressed", "#FFFFFF")]
+        )
+    except Exception:
+        pass
+
+
 def apply_theme(mode: str = "dark"):
     """Applies global appearance mode (light / dark)."""
     if not HAS_CTK:
@@ -237,7 +305,14 @@ def apply_theme(mode: str = "dark"):
 
 
 def apply_glass_theme(mode: str = "dark"):
+    """Applies global appearance mode and configures Treeview glass styles."""
     if not HAS_CTK:
         return
     apply_theme(mode)
     ctk.set_default_color_theme("blue")
+    configure_treeview_glass_style(mode)
+
+
+def apply_theme_to_widget(widget, theme: str = "dark"):
+    """Recursively updates appearance and theme tokens."""
+    apply_glass_theme(theme)
