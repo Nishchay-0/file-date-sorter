@@ -440,7 +440,7 @@ if HAS_CUSTOMTKINTER:
             title_lbl = ctk.CTkLabel(
                 title_frame,
                 text="⬡  Smart File Organizer Suite",
-                font=ctk.CTkFont(family="Segoe UI", size=19, weight="bold"),
+                font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
                 text_color=GLASS["text_primary"] if HAS_THEME else None
             )
             title_lbl.pack(side="left")
@@ -525,14 +525,14 @@ if HAS_CUSTOMTKINTER:
             )
             main_card.pack(fill="both", expand=True, padx=10, pady=(0, 4))
 
-            # ── Left Sidebar Toolbar ───────────────────────────────────────────
+            # ── Right Sidebar Toolbar (Strict Dribbble Reference) ──────────────
             self.sidebar = RightSidebarToolbar(main_card, self)
-            self.sidebar.pack(side="left", fill="y", padx=(4, 2), pady=4)
+            self.sidebar.pack(side="right", fill="y", padx=(2, 6), pady=6)
 
-            # ── Tab Navigation View ────────────────────────────────────────────
+            # ── Main Content Area (Left of Sidebar, Top Tab Bar Removed) ───────
             self.tabview = ctk.CTkTabview(
                 main_card,
-                corner_radius=12,
+                corner_radius=16,
                 command=self._on_tab_changed,
                 fg_color=GLASS["bg_card"] if HAS_THEME else None,
                 border_color=GLASS["border"] if HAS_THEME else None,
@@ -544,7 +544,14 @@ if HAS_CUSTOMTKINTER:
                 segmented_button_unselected_hover_color=GLASS["bg_hover"] if HAS_THEME else None,
                 text_color=GLASS["text_primary"] if HAS_THEME else None,
             )
-            self.tabview.pack(side="right", fill="both", expand=True, padx=(2, 4), pady=4)
+            self.tabview.pack(side="left", fill="both", expand=True, padx=(6, 2), pady=6)
+
+            # Strict Dribbble Redesign: Remove horizontal top tab bar completely
+            if hasattr(self.tabview, '_segmented_button') and self.tabview._segmented_button:
+                try:
+                    self.tabview._segmented_button.grid_remove()
+                except Exception:
+                    pass
 
             self.tab_organizer = self.tabview.add("📅 File Organizer")
             self.tab_duplicates = self.tabview.add("🔍 Duplicates Finder")

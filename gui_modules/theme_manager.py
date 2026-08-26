@@ -70,11 +70,11 @@ def _font(size=12, weight="normal", family="Segoe UI"):
 
 
 FONTS = {
-    "title":   lambda: _font(19, "bold"),
+    "title":   lambda: _font(22, "bold"),
     "h1":      lambda: _font(15, "bold"),
     "h2":      lambda: _font(13, "bold"),
     "body":    lambda: _font(12, "normal"),
-    "caption": lambda: _font(10, "normal"),
+    "caption": lambda: _font(11, "normal"),
     "badge":   lambda: _font(10, "bold"),
     "mono":    lambda: _font(11, "normal", "Consolas"),
 }
