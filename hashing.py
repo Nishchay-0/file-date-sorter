@@ -169,14 +169,24 @@ def fix_win_long_path(path):
     return path
 
 
-def get_file_hash(filepath, block_size=65536):
-    """Calculates SHA-256 hash of a file for exact duplicate detection."""
+def get_file_hash(filepath, block_size=65536, cancel_event=None):
+    """
+    Calculates SHA-256 hash of a file for exact duplicate detection.
+
+    Args:
+        filepath: Path to the file.
+        block_size: Read chunk size in bytes (default 64 KB).
+        cancel_event: Optional threading.Event — if set(), hashing aborts and
+                      returns None immediately without raising an exception.
+    """
     hasher = hashlib.sha256()
     safe_fp = fix_win_long_path(filepath)
     try:
         with open(safe_fp, 'rb') as f:
             buf = f.read(block_size)
             while len(buf) > 0:
+                if cancel_event is not None and cancel_event.is_set():
+                    return None  # Cancelled by caller
                 hasher.update(buf)
                 buf = f.read(block_size)
         return hasher.hexdigest()
@@ -184,21 +194,30 @@ def get_file_hash(filepath, block_size=65536):
         return None
 
 
-def get_file_fast_hash(filepath, chunk_size=65536):
+def get_file_fast_hash(filepath, chunk_size=65536, cancel_event=None):
     """
     Computes a quick partial hash (file size + head 64KB + tail 64KB) for rapid candidate pre-screening.
+
+    Args:
+        filepath: Path to the file.
+        chunk_size: Head/tail read size in bytes (default 64 KB).
+        cancel_event: Optional threading.Event — if set(), hashing aborts and returns None.
     """
     safe_fp = fix_win_long_path(filepath)
     try:
         size = os.path.getsize(safe_fp)
         if size == 0:
             return "empty_0"
+        if cancel_event is not None and cancel_event.is_set():
+            return None
         hasher = hashlib.md5()
         hasher.update(str(size).encode('utf-8'))
         with open(safe_fp, 'rb') as f:
             head = f.read(chunk_size)
             hasher.update(head)
             if size > chunk_size * 2:
+                if cancel_event is not None and cancel_event.is_set():
+                    return None
                 f.seek(size - chunk_size)
                 tail = f.read(chunk_size)
                 hasher.update(tail)

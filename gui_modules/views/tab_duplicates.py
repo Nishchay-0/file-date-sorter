@@ -380,7 +380,33 @@ def setup_duplicates_tab(gui_instance):
         text_color=("gray40", "gray60"),
         anchor="w"
     )
-    gui_instance.dup_progress_detail_lbl.pack(fill="x", padx=10, pady=(0, 4))
+    gui_instance.dup_progress_detail_lbl.pack(fill="x", padx=10, pady=(0, 2))
+
+    # ── Cancel Scan button ─────────────────────────────────────────────────
+    def _cancel_dup_scan():
+        ev = getattr(gui_instance, '_dup_cancel_event', None)
+        if ev is not None:
+            ev.set()
+        gui_instance._dup_scan_running = False
+        try:
+            gui_instance.dup_progress_title.configure(text="🛑 Scan cancelled by user.")
+            gui_instance.status_var.set("Duplicate scan cancelled.")
+        except Exception:
+            pass
+
+    gui_instance.dup_cancel_btn = ctk.CTkButton(
+        gui_instance.dup_progress_frame,
+        text="🛑 Cancel Scan",
+        command=_cancel_dup_scan,
+        font=ctk.CTkFont(size=10, weight="bold"),
+        fg_color=("#FF3B30", "#FF453A"),
+        hover_color=("#CC2E25", "#CC362E"),
+        height=24,
+        width=110,
+        corner_radius=8
+    )
+    gui_instance.dup_cancel_btn.pack(anchor="e", padx=10, pady=(0, 6))
+
 
     # Live Duplicate Breakdown & Space Savings Preview Card (Matching File Organiser Layout!)
     gui_instance.dup_summary_card = ctk.CTkFrame(main_container, corner_radius=16, fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray90", "gray17"))

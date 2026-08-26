@@ -132,14 +132,21 @@ def hide_path_windows(path):
             pass
 
 
-def get_file_hash(filepath, block_size=65536):
-    """Calculates SHA-256 hash of a file for exact duplicate detection."""
+def get_file_hash(filepath, block_size=65536, cancel_event=None):
+    """
+    Calculates SHA-256 hash of a file for exact duplicate detection.
+
+    Args:
+        cancel_event: Optional threading.Event — if set(), hashing aborts and returns None.
+    """
     hasher = hashlib.sha256()
     safe_fp = fix_win_long_path(filepath)
     try:
         with open(safe_fp, 'rb') as f:
             buf = f.read(block_size)
             while len(buf) > 0:
+                if cancel_event is not None and cancel_event.is_set():
+                    return None
                 hasher.update(buf)
                 buf = f.read(block_size)
         return hasher.hexdigest()
@@ -147,27 +154,70 @@ def get_file_hash(filepath, block_size=65536):
         return None
 
 
-def get_file_fast_hash(filepath, chunk_size=65536):
+def get_file_fast_hash(filepath, chunk_size=65536, cancel_event=None):
     """
     Computes a quick partial hash (file size + head 64KB + tail 64KB) for rapid candidate pre-screening.
+
+    Args:
+        cancel_event: Optional threading.Event — if set(), aborts and returns None.
     """
     safe_fp = fix_win_long_path(filepath)
     try:
         size = os.path.getsize(safe_fp)
         if size == 0:
             return "empty_0"
+        if cancel_event is not None and cancel_event.is_set():
+            return None
         hasher = hashlib.md5()
         hasher.update(str(size).encode('utf-8'))
         with open(safe_fp, 'rb') as f:
             head = f.read(chunk_size)
             hasher.update(head)
             if size > chunk_size * 2:
+                if cancel_event is not None and cancel_event.is_set():
+                    return None
                 f.seek(size - chunk_size)
                 tail = f.read(chunk_size)
                 hasher.update(tail)
         return hasher.hexdigest()
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Per-scan os.stat() Cache
+# ---------------------------------------------------------------------------
+# During a preview + execution pass over N files, get_file_date() calls
+# os.stat() for every file. This cache eliminates duplicate syscalls by
+# storing stat results keyed by absolute path for the duration of one scan.
+# Always call clear_stat_cache() before starting a new scan.
+
+_stat_cache: dict = {}
+_stat_cache_lock = threading.Lock()
+
+
+def clear_stat_cache():
+    """Clears the per-scan stat cache. Call before each new scan session."""
+    with _stat_cache_lock:
+        _stat_cache.clear()
+
+
+def get_cached_stat(path):
+    """
+    Returns os.stat(path), using a thread-safe in-memory cache to avoid
+    repeated syscalls for the same file within a single scan session.
+    Returns None on error.
+    """
+    with _stat_cache_lock:
+        if path in _stat_cache:
+            return _stat_cache[path]
+    try:
+        result = os.stat(path)
+    except Exception:
+        return None
+    with _stat_cache_lock:
+        _stat_cache[path] = result
+    return result
 
 
 def get_image_perceptual_hash(filepath, hash_size=8):
@@ -424,7 +474,7 @@ def get_file_date(filepath, date_source='ctime', date_format_preference='DMY'):
     # 3. Fallback to OS file system stat timestamps (ctime/mtime) if dt is still None
     if dt is None:
         try:
-            stat = os.stat(safe_fp)
+            stat = get_cached_stat(safe_fp) or os.stat(safe_fp)
             if 'mtime' in ds_lower:
                 timestamp = stat.st_mtime
             else:

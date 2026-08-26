@@ -801,18 +801,29 @@ if HAS_CUSTOMTKINTER:
             self.wtc_stats_files_lbl.configure(text=f"Files Auto-Organized This Session: {count}")
             self.wtc_stats_active_folder_lbl.configure(text=f"Watched Target Folder: {folder}")
 
-        def populate_tree_in_chunks(self, tree, rows, chunk_size=300, current_idx=0):
-            """Inserts treeview rows in non-blocking UI chunks to prevent freezing with large datasets."""
+        def populate_tree_in_chunks(self, tree, rows, chunk_size=300, current_idx=0, _gen_id=None):
+            """Inserts treeview rows in non-blocking UI chunks to prevent freezing with large datasets.
+
+            Uses a generation ID to automatically discard stale batch inserts when a new
+            scan has already started before all chunks of the previous one finished rendering.
+            """
+            # Assign / advance generation ID on the first call
             if current_idx == 0:
+                self._populate_gen = getattr(self, '_populate_gen', 0) + 1
+                _gen_id = self._populate_gen
                 for item in tree.get_children():
                     tree.delete(item)
+
+            # Abort if a newer populate has started for this same tree
+            if _gen_id is not None and getattr(self, '_populate_gen', _gen_id) != _gen_id:
+                return
 
             end_idx = min(current_idx + chunk_size, len(rows))
             for i in range(current_idx, end_idx):
                 tree.insert("", "end", values=rows[i])
 
             if end_idx < len(rows):
-                self.after(10, self.populate_tree_in_chunks, tree, rows, chunk_size, end_idx)
+                self.after(10, self.populate_tree_in_chunks, tree, rows, chunk_size, end_idx, _gen_id)
 
         # Delegates to handlers defined in view / core modules
         def browse_individual_files(self):
@@ -1835,6 +1846,11 @@ if HAS_CUSTOMTKINTER:
             )
 
         def run_find_duplicates(self):
+            # ── Double-click guard: prevent overlapping scan threads ──────────────
+            if getattr(self, '_dup_scan_running', False):
+                self.status_var.set("⏳ Scan already in progress — please wait...")
+                return
+
             target_dir = self.dup_dir_var.get().strip().strip('\'"')
             selected_files = getattr(self, "dup_selected_individual_files", None)
 
@@ -1842,8 +1858,14 @@ if HAS_CUSTOMTKINTER:
                 messagebox.showwarning("Missing Directory", "Please select a valid directory to scan for duplicates.")
                 return
 
+            # Fresh cancellation event for this scan session
+            self._dup_cancel_event = threading.Event()
+            self._dup_scan_running = True
+            self._scan_start_time = time.time()  # ETA tracking
+
             match_mode = self.dup_match_var.get()
             is_recursive = self.dup_recursive_var.get()
+
 
             # Cloud-Aware Pre-Check & Informed Consent Dialog
             if match_mode in ('content', 'perceptual_image', 'text_similarity'):
@@ -1946,18 +1968,36 @@ if HAS_CUSTOMTKINTER:
                     self.dup_log(f"⚙️ Match Rule:  {match_mode} (Recursive: {is_recursive})", tag="info")
 
                     def on_progress(processed, total, stage_name, filename):
+                        # Abort progress updates if cancelled
+                        if self._dup_cancel_event.is_set():
+                            return
                         def update_prog_ui():
                             if not hasattr(self, 'dup_progress_bar'):
                                 return
                             pct = (processed / float(total)) if total > 0 else 0.0
                             pct_int = int(pct * 100)
+                            # ETA computation
+                            eta_str = ""
+                            start_t = getattr(self, '_scan_start_time', None)
+                            if start_t is not None and processed > 0 and pct < 1.0:
+                                elapsed = time.time() - start_t
+                                total_est = elapsed / pct
+                                remaining = max(0.0, total_est - elapsed)
+                                mins, secs = divmod(int(remaining), 60)
+                                hrs, mins = divmod(mins, 60)
+                                if hrs > 0:
+                                    eta_str = f" — ETA {hrs}h {mins:02d}m"
+                                elif mins > 0:
+                                    eta_str = f" — ETA {mins}m {secs:02d}s"
+                                else:
+                                    eta_str = f" — ETA {secs}s"
                             try:
                                 self.dup_progress_bar.set(pct)
                                 self.dup_progress_pct_lbl.configure(text=f"{pct_int}%")
                                 self.dup_progress_title.configure(text=f"⚡ {stage_name}")
                                 fn_str = f" Currently: {filename}" if filename else ""
                                 self.dup_progress_detail_lbl.configure(text=f"📄 [{processed}/{total}] files scanned.{fn_str}")
-                                self.status_var.set(f"Scanning... {pct_int}% ({processed}/{total} files)")
+                                self.status_var.set(f"Scanning... {pct_int}%{eta_str} ({processed}/{total} files)")
                             except Exception:
                                 pass
                         self.after(0, update_prog_ui)
@@ -1980,6 +2020,7 @@ if HAS_CUSTOMTKINTER:
 
                     def update_ui():
                         try:
+                            self._dup_scan_running = False
                             self.dup_groups = groups
                             self.dup_checkbox_vars.clear()
                             self.dup_card_widgets = []
@@ -2062,6 +2103,7 @@ if HAS_CUSTOMTKINTER:
                     self.after(0, update_ui)
                 except Exception as err:
                     def on_err():
+                        self._dup_scan_running = False
                         if hasattr(self, 'dup_progress_frame'):
                             self.dup_progress_frame.pack_forget()
                         for widget in self.dup_cards_scroll.winfo_children():
@@ -5082,7 +5124,24 @@ if HAS_CUSTOMTKINTER:
                 except Exception:
                     pass
             fname = os.path.basename(file_path)
-            self.status_var.set(f"Processing ({current}/{total}): {fname}")
+
+            # ETA calculation
+            eta_str = ""
+            start_t = getattr(self, '_scan_start_time', None)
+            if start_t is not None and current > 0 and pct < 1.0:
+                elapsed = time.time() - start_t
+                total_est = elapsed / pct
+                remaining = max(0.0, total_est - elapsed)
+                mins, secs = divmod(int(remaining), 60)
+                hrs, mins = divmod(mins, 60)
+                if hrs > 0:
+                    eta_str = f" — ETA {hrs}h {mins:02d}m"
+                elif mins > 0:
+                    eta_str = f" — ETA {mins}m {secs:02d}s"
+                else:
+                    eta_str = f" — ETA {secs}s"
+
+            self.status_var.set(f"Processing ({current}/{total}){eta_str}: {fname}")
             self.log(f"[{current}/{total}] {fname}: {status_msg}", status_tag)
 
         def set_ui_state(self, running):
@@ -5202,6 +5261,7 @@ if HAS_CUSTOMTKINTER:
 
             self.set_ui_state(True)
             self.progress_bar.set(0)
+            self._scan_start_time = time.time()  # ETA tracking
 
             def run_thread():
                 try:
