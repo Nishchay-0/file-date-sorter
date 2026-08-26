@@ -1,9 +1,9 @@
 """
-sidebar.py — Right-Side Collapsible Toolbar Navigation
+sidebar.py — Left-Side Collapsible Toolbar Navigation
 Smart File Organizer Suite Pro
 
-Implements a sleek vertical sidebar toolbar positioned on the right side of the window
-with strict Apple Big Sur glassmorphism styling, tool switching buttons, and one-click expand/collapse.
+Implements a sleek vertical sidebar toolbar on the left side of the window
+with glassmorphism styling, tool switching buttons, and one-click expand/collapse.
 """
 
 import tkinter as tk
@@ -20,6 +20,12 @@ try:
 except ImportError:
     HAS_THEME = False
 
+try:
+    from gui_modules.components import enhance_scrollable_frame_speed
+    HAS_COMPONENTS = True
+except ImportError:
+    HAS_COMPONENTS = False
+
 
 TOOLS = [
     {"key": "organizer",   "icon": "📅", "short": "Organizer",  "title": "📅 File Organizer"},
@@ -35,10 +41,10 @@ TOOLS = [
 ]
 
 
-class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
+class LeftSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
     """
-    Vertical sidebar toolbar positioned on the right side of the main workspace.
-    Supports full mode (Icons + Labels, width 200px) and collapsed mode (Icons only, width 64px).
+    Vertical sidebar toolbar positioned on the side of the main application.
+    Supports full mode (Icons + Labels, width ~150px) and collapsed mode (Icons only, width ~52px).
     """
     def __init__(self, parent, app_instance, **kwargs):
         if not HAS_CTK:
@@ -52,7 +58,7 @@ class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
             "fg_color": bg_card,
             "border_color": border,
             "border_width": 1,
-            "width": 200,
+            "width": 148,
         }
         defaults.update(kwargs)
         super().__init__(parent, **defaults)
@@ -68,32 +74,38 @@ class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
         self._setup_ui()
 
     def _setup_ui(self):
-        # Header title for sidebar (Tools / Actions)
-        self.hdr_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.hdr_frame.pack(fill="x", padx=8, pady=(10, 6))
+        # Header / Collapse Toggle Row
+        hdr_frame = ctk.CTkFrame(self, fg_color="transparent")
+        hdr_frame.pack(fill="x", padx=6, pady=(8, 6))
 
-        self.hdr_label = ctk.CTkLabel(
-            self.hdr_frame,
-            text="✨ TOOLS",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=GLASS["text_secondary"] if HAS_THEME else "gray60",
-            anchor="w"
+        self.toggle_btn = ctk.CTkButton(
+            hdr_frame,
+            text="⏮️ Collapse",
+            command=self.toggle_collapse,
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            height=26,
+            corner_radius=8,
+            fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray80", "gray25"),
+            text_color=GLASS["text_primary"] if HAS_THEME else ("gray10", "gray90"),
+            hover_color=GLASS["bg_hover"] if HAS_THEME else ("gray70", "gray35")
         )
-        self.hdr_label.pack(side="left", padx=4)
+        self.toggle_btn.pack(fill="x")
 
         # Scrollable or stacked tool buttons container
         self.btn_container = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
-        self.btn_container.pack(fill="both", expand=True, padx=4, pady=(0, 4))
+        self.btn_container.pack(fill="both", expand=True, padx=4, pady=(0, 6))
         self.btn_container.grid_columnconfigure(0, weight=1)
+        if HAS_COMPONENTS:
+            enhance_scrollable_frame_speed(self.btn_container)
 
         for idx, tool in enumerate(TOOLS):
             btn = ctk.CTkButton(
                 self.btn_container,
-                text=f"{tool['icon']}   {tool['short']}",
+                text=f"{tool['icon']}  {tool['short']}",
                 anchor="w",
                 command=lambda t=tool: self.select_tool(t["key"]),
-                font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-                height=36,
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                height=34,
                 corner_radius=10,
                 fg_color="transparent",
                 text_color=GLASS["text_primary"] if HAS_THEME else ("gray15", "gray90"),
@@ -104,23 +116,6 @@ class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
                 "widget": btn,
                 "tool": tool
             }
-
-        # Bottom Collapse Toggle Button
-        btm_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btm_frame.pack(fill="x", padx=6, pady=(4, 8))
-
-        self.toggle_btn = ctk.CTkButton(
-            btm_frame,
-            text="⏩ Collapse",
-            command=self.toggle_collapse,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            height=30,
-            corner_radius=10,
-            fg_color=GLASS["bg_card_alt"] if HAS_THEME else ("gray80", "gray25"),
-            text_color=GLASS["text_primary"] if HAS_THEME else ("gray10", "gray90"),
-            hover_color=GLASS["bg_hover"] if HAS_THEME else ("gray70", "gray35")
-        )
-        self.toggle_btn.pack(fill="x")
 
         self.update_active_highlight("organizer")
 
@@ -148,24 +143,21 @@ class RightSidebarToolbar(ctk.CTkFrame if HAS_CTK else object):
     def toggle_collapse(self):
         self.is_collapsed = not self.is_collapsed
         if self.is_collapsed:
-            self.configure(width=64)
-            self.hdr_label.configure(text="✨", anchor="center")
-            self.toggle_btn.configure(text="◀️")
+            self.configure(width=52)
+            self.toggle_btn.configure(text="☰")
             for item in self.buttons.values():
                 btn = item["widget"]
                 tool = item["tool"]
                 btn.configure(text=tool["icon"], anchor="center")
         else:
-            self.configure(width=200)
-            self.hdr_label.configure(text="✨ TOOLS", anchor="w")
-            self.toggle_btn.configure(text="⏩ Collapse")
+            self.configure(width=148)
+            self.toggle_btn.configure(text="⏮️ Collapse")
             for item in self.buttons.values():
                 btn = item["widget"]
                 tool = item["tool"]
-                btn.configure(text=f"{tool['icon']}   {tool['short']}", anchor="w")
+                btn.configure(text=f"{tool['icon']}  {tool['short']}", anchor="w")
 
 
 # Aliases for compatibility
-LeftSidebarToolbar = RightSidebarToolbar
-SidebarToolbar = RightSidebarToolbar
-
+RightSidebarToolbar = LeftSidebarToolbar
+SidebarToolbar = LeftSidebarToolbar

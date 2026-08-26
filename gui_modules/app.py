@@ -21,7 +21,8 @@ from gui_modules.components import (
     create_info_icon,
     get_user_folder,
     Windows11ConflictDialog,
-    GRANULAR_FILE_TYPES
+    GRANULAR_FILE_TYPES,
+    enhance_scrollable_frame_speed
 )
 
 from gui_modules.views.tab_sorter import setup_organizer_tab
@@ -525,14 +526,14 @@ if HAS_CUSTOMTKINTER:
             )
             main_card.pack(fill="both", expand=True, padx=10, pady=(0, 4))
 
-            # ── Right Sidebar Toolbar (Strict Dribbble Reference) ──────────────
+            # ── Left Sidebar Toolbar ───────────────────────────────────────────
             self.sidebar = RightSidebarToolbar(main_card, self)
-            self.sidebar.pack(side="right", fill="y", padx=(2, 6), pady=6)
+            self.sidebar.pack(side="left", fill="y", padx=(4, 2), pady=4)
 
-            # ── Main Content Area (Left of Sidebar, Top Tab Bar Removed) ───────
+            # ── Tab Navigation View ────────────────────────────────────────────
             self.tabview = ctk.CTkTabview(
                 main_card,
-                corner_radius=16,
+                corner_radius=12,
                 command=self._on_tab_changed,
                 fg_color=GLASS["bg_card"] if HAS_THEME else None,
                 border_color=GLASS["border"] if HAS_THEME else None,
@@ -544,14 +545,7 @@ if HAS_CUSTOMTKINTER:
                 segmented_button_unselected_hover_color=GLASS["bg_hover"] if HAS_THEME else None,
                 text_color=GLASS["text_primary"] if HAS_THEME else None,
             )
-            self.tabview.pack(side="left", fill="both", expand=True, padx=(6, 2), pady=6)
-
-            # Strict Dribbble Redesign: Remove horizontal top tab bar completely
-            if hasattr(self.tabview, '_segmented_button') and self.tabview._segmented_button:
-                try:
-                    self.tabview._segmented_button.grid_remove()
-                except Exception:
-                    pass
+            self.tabview.pack(side="right", fill="both", expand=True, padx=(2, 4), pady=4)
 
             self.tab_organizer = self.tabview.add("📅 File Organizer")
             self.tab_duplicates = self.tabview.add("🔍 Duplicates Finder")
@@ -647,6 +641,10 @@ if HAS_CUSTOMTKINTER:
                         except Exception:
                             pass
                     
+                    # If widget is a CTkScrollableFrame, apply fast mouse wheel scrolling speed
+                    if isinstance(widget, ctk.CTkScrollableFrame):
+                        enhance_scrollable_frame_speed(widget)
+
                     for child in widget.winfo_children():
                         _atomic_repaint_recursive(child)
                 except Exception:
@@ -664,33 +662,53 @@ if HAS_CUSTOMTKINTER:
             if "Organizer" in current and not self._tabs_loaded["organizer"]:
                 setup_organizer_tab(self)
                 self._tabs_loaded["organizer"] = True
+                if hasattr(self, 'organizer_scroll'):
+                    enhance_scrollable_frame_speed(self.organizer_scroll)
             elif "Duplicates" in current and not self._tabs_loaded["duplicates"]:
                 setup_duplicates_tab(self)
                 self._tabs_loaded["duplicates"] = True
+                if hasattr(self, 'dup_main_scroll'):
+                    enhance_scrollable_frame_speed(self.dup_main_scroll)
             elif "People" in current and not self._tabs_loaded.get("people"):
                 setup_people_tab(self)
                 self._tabs_loaded["people"] = True
+                if hasattr(self, 'people_scroll'):
+                    enhance_scrollable_frame_speed(self.people_scroll)
             elif "Extractor" in current and not self._tabs_loaded["extractor"]:
                 setup_extractor_tab(self)
                 self._tabs_loaded["extractor"] = True
+                if hasattr(self, 'extractor_scroll'):
+                    enhance_scrollable_frame_speed(self.extractor_scroll)
             elif "Converter" in current and not self._tabs_loaded["converter"]:
                 setup_converter_tab(self)
                 self._tabs_loaded["converter"] = True
+                if hasattr(self, 'converter_scroll'):
+                    enhance_scrollable_frame_speed(self.converter_scroll)
             elif "Renamer" in current and not self._tabs_loaded["renamer"]:
                 setup_renamer_tab(self)
                 self._tabs_loaded["renamer"] = True
+                if hasattr(self, 'renamer_scroll'):
+                    enhance_scrollable_frame_speed(self.renamer_scroll)
             elif "Cleaner" in current and not self._tabs_loaded["cleaner"]:
                 setup_cleaner_tab(self)
                 self._tabs_loaded["cleaner"] = True
+                if hasattr(self, 'cleaner_scroll'):
+                    enhance_scrollable_frame_speed(self.cleaner_scroll)
             elif "Analytics" in current and not self._tabs_loaded["insights"]:
                 setup_insights_tab(self)
                 self._tabs_loaded["insights"] = True
+                if hasattr(self, 'insights_scroll'):
+                    enhance_scrollable_frame_speed(self.insights_scroll)
             elif "Watcher" in current and not self._tabs_loaded["watcher"]:
                 setup_watcher_tab(self)
                 self._tabs_loaded["watcher"] = True
+                if hasattr(self, 'watcher_scroll'):
+                    enhance_scrollable_frame_speed(self.watcher_scroll)
             elif "Exclusions" in current and not self._tabs_loaded["exclusions"]:
                 setup_exclusions_tab(self)
                 self._tabs_loaded["exclusions"] = True
+                if hasattr(self, 'exclusions_scroll'):
+                    enhance_scrollable_frame_speed(self.exclusions_scroll)
 
             # Sync RightSidebarToolbar active selection
             tab_to_key = {

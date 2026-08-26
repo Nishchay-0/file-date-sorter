@@ -501,3 +501,39 @@ class Windows11ConflictDialog(_BaseToplevel):
         except Exception:
             pass
         self.destroy()
+
+
+def enhance_scrollable_frame_speed(scroll_frame, step_multiplier=3):
+    """
+    Boosts mouse wheel scrolling speed on CTkScrollableFrame.
+    Scrolls step_multiplier units (e.g. 3-4 units) per wheel tick instead of the default 1 unit,
+    providing lightning-fast, smooth scrolling across the entire UI.
+    """
+    if not hasattr(scroll_frame, "_parent_canvas"):
+        return scroll_frame
+    canvas = scroll_frame._parent_canvas
+
+    def _fast_mousewheel(event):
+        try:
+            if sys.platform.startswith("win") or sys.platform.startswith("darwin"):
+                if event.delta:
+                    direction = -1 if event.delta > 0 else 1
+                    ticks = max(1, abs(int(event.delta / 120))) if abs(event.delta) >= 120 else 1
+                    canvas.yview_scroll(direction * ticks * step_multiplier, "units")
+                    return "break"
+            elif event.num == 4:
+                canvas.yview_scroll(-step_multiplier, "units")
+                return "break"
+            elif event.num == 5:
+                canvas.yview_scroll(step_multiplier, "units")
+                return "break"
+        except Exception:
+            pass
+
+    try:
+        canvas.bind("<MouseWheel>", _fast_mousewheel, add="+")
+        canvas.bind("<Button-4>", _fast_mousewheel, add="+")
+        canvas.bind("<Button-5>", _fast_mousewheel, add="+")
+    except Exception:
+        pass
+    return scroll_frame
