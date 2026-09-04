@@ -234,6 +234,16 @@ class FolderWatcherService:
                 pass
             self.observer = None
 
+        if self.worker_thread and self.worker_thread.is_alive():
+            try:
+                self.worker_thread.join(timeout=1.0)
+            except Exception:
+                pass
+            self.worker_thread = None
+
+        with self.lock:
+            self.pending_files.clear()
+
         save_settings({"auto_start_watcher": False})
 
         if self.callback_notify:
