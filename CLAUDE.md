@@ -1,17 +1,18 @@
-> Read this file fully before searching or scanning the codebase. Only search for something if it's not already documented here. If you do have to search, add what you found back into this file before finishing, so the next session doesn't have to search again.
+AGENT DIRECTIVE: Read this file fully before searching or scanning the codebase. Only search for something if it is not documented here. If you search for and discover new codebase structures, add what you found back into this file before finishing the task so future sessions do not need to repeat the search.
 
 # Smart File Organizer Suite Pro — Working Agreement & Project Guide
 
 ## 🚨 Critical Non-Negotiable Hard Constraints
 
-1. **Continuous GitHub Sync & Automated Commits**: Always stage, commit with clear descriptive semantic messages, and push all verified changes and task outputs to GitHub (`origin/main`) upon task completion, ensuring secrets hygiene and test verification before pushing.
-2. **Zero-Deletion / Zero Data Loss Guarantee**: Destructive operations (move, delete, overwrite, rename) MUST always generate an atomic Zip backup vault and `.undo_manifest.json` before modifying files, with 1-click restore functionality.
-3. **Cloud Placeholder Safety**: Always inspect Windows sparse/reparse cloud stub attributes (`is_cloud_placeholder` in `hashing.py`) before reading files to prevent triggering unintentional gigabyte downloads on OneDrive, iCloud, or Dropbox synced directories.
-4. **Secrets & Hygiene Pre-Push Check**: Scan git diffs for credentials, tokens, or API keys before pushing; exclude sensitive files in `.gitignore`.
-5. **No Telemetry / Data Sharing**: Never transmit or share user data to external servers without explicit consent (Constraint 002).
-6. **No Silent Fallbacks**: Always surface degradation visibly (e.g. missing face models, permission errors) (Constraint 004).
-7. **Dry-Run Exact Match**: Preview mode must match real execution exactly before confirmation (Constraint 006).
-8. **Windows Path Resilience**: All paths must pass through `fix_win_long_path` (`\\?\` prefix support) and sanitize invalid NTFS characters.
+1. **Personal Data Protection & Zero-PII Leakage Policy (STRICT)**: Never commit or push personal data (PII) including real names, emails, credentials, user databases, or personal media. Use synthetic or anonymized fixtures only.
+2. **Continuous GitHub Sync & Automated Commits**: Always stage, commit with clear descriptive semantic messages, and push all verified changes and task outputs to GitHub (`origin/main` / active branch) upon task completion, ensuring secrets hygiene and test verification before pushing.
+3. **Zero-Deletion / Zero Data Loss Guarantee**: Destructive operations (move, delete, overwrite, rename) MUST always generate an atomic Zip backup vault and `.undo_manifest.json` before modifying files, with 1-click restore functionality.
+4. **Cloud Placeholder Safety**: Always inspect Windows sparse/reparse cloud stub attributes (`is_cloud_placeholder` in `hashing.py`) before reading files to prevent triggering unintentional gigabyte downloads on OneDrive, iCloud, or Dropbox synced directories.
+5. **Secrets & Hygiene Pre-Push Check**: Scan git diffs for credentials, tokens, or API keys before pushing; exclude sensitive files in `.gitignore`.
+6. **No Telemetry / Data Sharing**: Never transmit or share user data to external servers without explicit consent (Constraint 002).
+7. **No Silent Fallbacks**: Always surface degradation visibly (e.g. missing face models, permission errors) (Constraint 004).
+8. **Dry-Run Exact Match**: Preview mode must match real execution exactly before confirmation (Constraint 006).
+9. **Windows Path Resilience**: All paths must pass through `fix_win_long_path` (`\\?\` prefix support) and sanitize invalid NTFS characters.
 
 ---
 
@@ -20,11 +21,14 @@
 ```
 PROJECT: Smart File Organizer Suite Pro
 PURPOSE: High-performance desktop GUI & CLI utility for organizing, deduplicating, batch renaming, converting, and indexing files and media across deep directory hierarchies with face recognition and system vault backup/undo.
-STACK: Python 3.11+, CustomTkinter, OpenCV (YuNet/SFace), ONNX Runtime, scikit-learn (DBSCAN), Pillow, Send2Trash, Watchdog, PyInstaller, Inno Setup
+STACK: Python 3.11+, CustomTkinter, OpenCV (YuNet/SFace), ONNX Runtime, scikit-learn (DBSCAN), Pillow, Send2Trash, Watchdog, Docker, PyInstaller, Inno Setup
 HOW TO RUN:
   - GUI: python run_sorter.py or python gui.py
   - CLI: python cli.py --help
   - Tests: $env:TCL_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python314\tcl\tcl8.6"; $env:TK_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python314\tcl\tk8.6"; py -3.14 -m pytest -v
+  - Docker Compose CLI: docker compose run --rm sorter --path /data --sort-category category --dry-run
+  - Docker Compose Tests: docker compose run --rm test
+  - Docker Compose Shell: docker compose run --rm shell
   - Build exe: python build_exe.py
   - Build installer: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 HARD CONSTRAINTS: Always commit & push to GitHub; Zero data loss (System Vault undo); Cloud safe mode; Windows-first long paths; No telemetry; Exact dry-run match.

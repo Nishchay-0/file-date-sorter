@@ -8,8 +8,8 @@
   - Moves and reorganizations default to Dry-Run preview.
   - Operations generate automatic System Vault zip backups (`get_system_vault_dir()`) and JSON undo manifests.
   - Deletions must use `send2trash` (OS Recycle Bin) instead of hard `os.remove()` / `shutil.rmtree()`, unless the user explicitly commands permanent removal.
+---
 
-<<<<<<< HEAD
 **CONSTRAINT-001: No Silent Destruction**
 - Every destructive operation (delete, overwrite, rename, move) must:
   1. Show preview (exact list of affected files)
@@ -165,4 +165,3 @@
 | **Face Clustering** | DBSCAN + Complete Linkage Cosine | K-Means, Agglomerative | K-Means requires pre-specifying $k$ (number of people), which is unknown in arbitrary photo libraries. DBSCAN discovers cluster counts automatically; complete linkage prevents mega-cluster chaining. |
 | **UI Framework** | CustomTkinter | PyQt, Electron, WxPython | Python-native, modern dark/light mode aesthetic without heavy runtime bloat or licensing complexities. |
 | **Duplicate Detection** | Tiered Hashing (Size -> Partial Head/Tail -> Full SHA-256) | Full SHA-256 on all files | Reduces disk I/O by >90% by discarding non-matching file sizes and quick sampling before full hash computation. |
->>>>>>> origin/main
