@@ -197,5 +197,79 @@ class TestCentralizedLogging(unittest.TestCase):
         self.assertEqual(root_log.level, logging.DEBUG)
 
 
+class TestSafeFileSystemUtils(unittest.TestCase):
+    """Tests for unified safe file-system abstraction functions in utils.py."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix="test_fs_utils_")
+        self.test_file = os.path.join(self.temp_dir, "sample.txt")
+        with open(self.test_file, "w") as f:
+            f.write("Test file system abstraction content")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_safe_checks(self):
+        from utils import safe_exists, safe_isfile, safe_isdir, safe_getsize, safe_listdir
+        self.assertTrue(safe_exists(self.test_file))
+        self.assertTrue(safe_isfile(self.test_file))
+        self.assertFalse(safe_isdir(self.test_file))
+        self.assertTrue(safe_isdir(self.temp_dir))
+        self.assertGreater(safe_getsize(self.test_file), 0)
+        self.assertIn("sample.txt", safe_listdir(self.temp_dir))
+
+        # Non-existent paths return safe falsy values without crashing
+        self.assertFalse(safe_exists(os.path.join(self.temp_dir, "ghost.xyz")))
+        self.assertFalse(safe_isfile(os.path.join(self.temp_dir, "ghost.xyz")))
+        self.assertFalse(safe_isdir(os.path.join(self.temp_dir, "ghost.xyz")))
+        self.assertEqual(safe_getsize(os.path.join(self.temp_dir, "ghost.xyz")), 0)
+        self.assertEqual(safe_listdir(os.path.join(self.temp_dir, "ghost.xyz")), [])
+
+    def test_safe_remove_and_rmdir(self):
+        from utils import safe_remove, safe_rmdir, safe_exists
+        sub = os.path.join(self.temp_dir, "empty_sub")
+        os.makedirs(sub, exist_ok=True)
+        file_to_del = os.path.join(sub, "trash.tmp")
+        with open(file_to_del, "w") as f:
+            f.write("junk")
+
+        self.assertTrue(safe_remove(file_to_del))
+        self.assertFalse(safe_exists(file_to_del))
+        self.assertTrue(safe_rmdir(sub))
+        self.assertFalse(safe_exists(sub))
+
+
+class TestCleanEmptyDirsDryRun(unittest.TestCase):
+    """Tests for clean_empty_dirs dry_run safety."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix="test_clean_empty_")
+        self.empty_sub1 = os.path.join(self.temp_dir, "empty_one")
+        self.empty_sub2 = os.path.join(self.temp_dir, "empty_two")
+        os.makedirs(self.empty_sub1, exist_ok=True)
+        os.makedirs(self.empty_sub2, exist_ok=True)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_dry_run_does_not_delete(self):
+        from sorter_core import clean_empty_dirs
+        from utils import safe_exists
+        # Dry run counts empty dirs but does NOT delete them
+        count = clean_empty_dirs(self.temp_dir, dry_run=True)
+        self.assertEqual(count, 2)
+        self.assertTrue(safe_exists(self.empty_sub1))
+        self.assertTrue(safe_exists(self.empty_sub2))
+
+        # Real run deletes them
+        deleted = clean_empty_dirs(self.temp_dir, dry_run=False)
+        self.assertEqual(deleted, 2)
+        self.assertFalse(safe_exists(self.empty_sub1))
+        self.assertFalse(safe_exists(self.empty_sub2))
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -49,7 +49,19 @@ from config import (
     FILE_CHUNK_SIZE,
     WIN_LONG_PATH_THRESHOLD
 )
-from utils import fix_win_long_path
+from utils import (
+    fix_win_long_path,
+    safe_exists,
+    safe_isfile,
+    safe_isdir,
+    safe_getsize,
+    safe_getmtime,
+    safe_stat,
+    safe_listdir,
+    safe_scandir,
+    safe_remove,
+    safe_rmdir
+)
 
 
 def get_extensions_for_categories(categories_list):
@@ -1811,41 +1823,24 @@ def scan_directory_preview(
 
 
 def _force_remove_file(file_path):
-    safe_path = fix_win_long_path(file_path)
-    try:
-        import stat
-        os.chmod(safe_path, stat.S_IWRITE | stat.S_IREAD)
-    except Exception:
-        pass
-    try:
-        os.remove(safe_path)
-        return True
-    except Exception:
-        return False
+    """Safely removes a file, resetting read-only/hidden attributes on Windows if necessary."""
+    return safe_remove(file_path)
 
 
 def _force_rmdir(dir_path):
-    safe_path = fix_win_long_path(dir_path)
-    try:
-        import stat
-        os.chmod(safe_path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
-    except Exception:
-        pass
-    try:
-        os.rmdir(safe_path)
-        return True
-    except Exception:
-        return False
+    """Safely removes an empty directory, resetting attributes on Windows if necessary."""
+    return safe_rmdir(dir_path)
 
 
-def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders=None):
+def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders=None, dry_run=False):
     """
     Recursively removes empty directories within folder.
+    If dry_run is True, returns count of empty directories that would be removed without touching disk.
     """
     if not folder:
         return 0
     folder = os.path.abspath(str(folder).strip().strip('\'"'))
-    if not os.path.isdir(fix_win_long_path(folder)):
+    if not safe_isdir(folder):
         return 0
 
     merged_excludes = list(DEFAULT_EXCLUDED_FOLDERS)
@@ -1854,6 +1849,10 @@ def clean_empty_dirs(folder, remove_os_junk=True, max_passes=10, exclude_folders
             merged_excludes.extend(list(exclude_folders))
         elif isinstance(exclude_folders, str):
             merged_excludes.extend([p.strip() for p in exclude_folders.replace(',', ';').split(';') if p.strip()])
+
+    if dry_run:
+        preview = scan_empty_dirs_preview(folder, remove_os_junk=remove_os_junk, exclude_folders=merged_excludes)
+        return len(preview)
 
     OS_JUNK_FILES = {'desktop.ini', 'thumbs.db', '.ds_store', '.bridgeortcache', '.bridgeortcachet'}
 

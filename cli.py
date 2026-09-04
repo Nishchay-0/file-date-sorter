@@ -11,7 +11,8 @@ from sorter_core import (
     organize_directory,
     list_manifest_files,
     undo_manifest,
-    clean_empty_dirs
+    clean_empty_dirs,
+    scan_empty_dirs_preview
 )
 
 def print_progress(current, total, file_path, status_msg, status_tag):
@@ -179,8 +180,14 @@ def main():
         target_dir = os.path.abspath(args.path)
         exc_folds = [f.strip() for f in args.exclude_folders.split(',')] if args.exclude_folders else None
         print(f"=== CLEANING EMPTY SUBFOLDERS IN: {target_dir} ===")
-        cleaned = clean_empty_dirs(target_dir, remove_os_junk=True, exclude_folders=exc_folds)
-        print(f"[OK] Cleaned {cleaned} empty folder(s)!")
+        if args.dry_run:
+            preview_items = scan_empty_dirs_preview(target_dir, remove_os_junk=True, exclude_folders=exc_folds)
+            print(f"[DRY-RUN] Found {len(preview_items)} empty folder(s) that would be cleaned:")
+            for it in preview_items:
+                print(f"  - {it.get('rel_path', it.get('folder_name'))} ({it.get('reason', 'Empty')})")
+        else:
+            cleaned = clean_empty_dirs(target_dir, remove_os_junk=True, exclude_folders=exc_folds, dry_run=False)
+            print(f"[OK] Cleaned {cleaned} empty folder(s)!")
         sys.exit(0)
 
     # Handle Undo Mode
