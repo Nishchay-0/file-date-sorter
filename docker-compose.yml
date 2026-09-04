@@ -1,0 +1,35 @@
+services:
+  # CLI Runner: Organize, deduplicate, rename, or extract files
+  sorter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smart-file-organizer:latest
+    container_name: smart-file-organizer
+    volumes:
+      - ./data:/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["--help"]
+
+  # Automated Test Suite: Runs pytest across all unit & integration tests
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smart-file-organizer:latest
+    container_name: smart-file-organizer-test
+    command: ["test"]
+
+  # Interactive Shell: For manual testing, debugging, or custom CLI commands
+  shell:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smart-file-organizer:latest
+    container_name: smart-file-organizer-shell
+    volumes:
+      - ./data:/data
+    stdin_open: true
+    tty: true
+    command: ["bash"]

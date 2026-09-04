@@ -56,6 +56,18 @@ python cli.py --path "C:\Target\Path" --clean-empty-only --exclude-folders ".git
 python cli.py --path "C:\Target\Path" --undo LATEST
 ```
 
+### Docker Environment
+```bash
+# Build image
+docker compose build
+
+# Run CLI sorting with mounted target directory
+docker run --rm -v "C:\Target\Path:/data" smart-file-organizer --path /data --sort-category category --dry-run
+
+# Run full test suite in container
+docker compose run --rm test
+```
+
 ### Test Suite Execution
 ```powershell
 $env:TCL_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python314\tcl\tcl8.6"
@@ -116,6 +128,11 @@ python build_exe.py
 ### Build & Spec Artifacts
 | File | Responsibility |
 | :--- | :--- |
+| [`Dockerfile`](file:///c:/file-date-sorter/Dockerfile) | Production container specification based on Python 3.11-slim with OpenCV, ONNX, and Tkinter runtime. |
+| [`docker-compose.yml`](file:///c:/file-date-sorter/docker-compose.yml) | Multi-service compose config for `sorter` (CLI), `test` (pytest), and `shell` (interactive). |
+| [`docker-entrypoint.sh`](file:///c:/file-date-sorter/docker-entrypoint.sh) | Container entrypoint script routing CLI flags, test runner, and shell commands. |
+| [`.dockerignore`](file:///c:/file-date-sorter/.dockerignore) | Docker build context exclusions for lightweight image generation. |
+| [`DOCKER.md`](file:///c:/file-date-sorter/DOCKER.md) | Comprehensive usage guide for running, testing, and mounting volumes in Docker. |
 | [`build_exe.py`](file:///c:/file-date-sorter/build_exe.py) | PyInstaller automation script with asset bundling and optional code-signing hooks. |
 | [`SmartFileOrganizer.spec`](file:///c:/file-date-sorter/SmartFileOrganizer.spec) | PyInstaller specification definition. |
 | [`installer.iss`](file:///c:/file-date-sorter/installer.iss) | Inno Setup Windows installer compilation script. |

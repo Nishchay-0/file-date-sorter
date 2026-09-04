@@ -99,6 +99,23 @@ python cli.py --path "C:\Target\Path" --undo LATEST
 
 ---
 
+## 🐳 Docker Quickstart
+
+Run Smart File Organizer Suite Pro in an isolated container without local Python setup. See [DOCKER.md](DOCKER.md) for full instructions.
+
+```bash
+# Build image
+docker compose build
+
+# CLI dry-run preview on a mounted folder
+docker run --rm -v "C:\Target\Path:/data" smart-file-organizer --path /data --sort-category category --dry-run
+
+# Run full test suite in container
+docker compose run --rm test
+```
+
+---
+
 ## 🧪 Testing
 
 ```powershell
