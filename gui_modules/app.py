@@ -561,6 +561,13 @@ if HAS_CUSTOMTKINTER:
             self.tab_watcher = self.tabview.add("👁️ Auto Watcher")
             self.tab_exclusions = self.tabview.add("🚫 Exclusions")
 
+            # Remove redundant top horizontal tab button bar — navigation is handled exclusively by the sidebar
+            if hasattr(self.tabview, "_segmented_button"):
+                self.tabview._segmented_button.grid_remove()
+                self.tabview.grid_rowconfigure(0, minsize=0, weight=0)
+                self.tabview.grid_rowconfigure(1, minsize=0, weight=0)
+                self.tabview.grid_rowconfigure(2, minsize=0, weight=0)
+
             self.StorageChartCanvas = StorageChartCanvas
 
             # LAZY LOADING: Load ONLY Tab 1 initially for lightning-fast startup!
