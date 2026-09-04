@@ -47,7 +47,8 @@ from config import (
     MONTH_NAMES,
     DEFAULT_PROTECTED_DIRS,
     FILE_CHUNK_SIZE,
-    WIN_LONG_PATH_THRESHOLD
+    WIN_LONG_PATH_THRESHOLD,
+    FILE_ATTRIBUTE_HIDDEN
 )
 from utils import (
     fix_win_long_path,
@@ -92,63 +93,11 @@ def get_system_vault_dir(subfolder=""):
 
 def hide_path_windows(path):
     """Marks a path as HIDDEN on Windows OS to prevent accidental user deletion."""
-    if sys.platform == 'win32' and os.path.exists(path):
+    if sys.platform == 'win32' and safe_exists(path):
         try:
-            ctypes.windll.kernel32.SetFileAttributesW(str(path), 2)  # 2 = FILE_ATTRIBUTE_HIDDEN
+            ctypes.windll.kernel32.SetFileAttributesW(str(fix_win_long_path(path)), FILE_ATTRIBUTE_HIDDEN)
         except Exception:
             pass
-
-
-def get_file_hash(filepath, block_size=65536, cancel_event=None):
-    """
-    Calculates SHA-256 hash of a file for exact duplicate detection.
-
-    Args:
-        cancel_event: Optional threading.Event — if set(), hashing aborts and returns None.
-    """
-    hasher = hashlib.sha256()
-    safe_fp = fix_win_long_path(filepath)
-    try:
-        with open(safe_fp, 'rb') as f:
-            buf = f.read(block_size)
-            while len(buf) > 0:
-                if cancel_event is not None and cancel_event.is_set():
-                    return None
-                hasher.update(buf)
-                buf = f.read(block_size)
-        return hasher.hexdigest()
-    except Exception:
-        return None
-
-
-def get_file_fast_hash(filepath, chunk_size=65536, cancel_event=None):
-    """
-    Computes a quick partial hash (file size + head 64KB + tail 64KB) for rapid candidate pre-screening.
-
-    Args:
-        cancel_event: Optional threading.Event — if set(), aborts and returns None.
-    """
-    safe_fp = fix_win_long_path(filepath)
-    try:
-        size = os.path.getsize(safe_fp)
-        if size == 0:
-            return "empty_0"
-        if cancel_event is not None and cancel_event.is_set():
-            return None
-        hasher = hashlib.md5()
-        hasher.update(str(size).encode('utf-8'))
-        with open(safe_fp, 'rb') as f:
-            head = f.read(chunk_size)
-            hasher.update(head)
-            if size > chunk_size * 2:
-                if cancel_event is not None and cancel_event.is_set():
-                    return None
-                f.seek(size - chunk_size)
-                tail = f.read(chunk_size)
-                hasher.update(tail)
-        return hasher.hexdigest()
-    except Exception:
-        return None
 
 
 # ---------------------------------------------------------------------------
