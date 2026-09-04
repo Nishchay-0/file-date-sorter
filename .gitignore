@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.log
+tmp_*.py
 
 # Environments
 .venv/
@@ -23,9 +25,14 @@ installer_output/
 Thumbs.db
 desktop.ini
 
+# Scratch & Temporary Test Artifacts
+scratch/
+test_super_duplicates_temp/
+
 # App Cache & Index Files
 .people_cache.json
 .people_index.json
+.undo_manifest.json
 
 # ML Models (downloaded on-demand, not committed)
 models/
@@ -34,7 +41,6 @@ models/
 # Build artifacts & tool configs
 .specify/
 .continue/
-
 
 # Secrets & Credentials (NEVER commit)
 .env

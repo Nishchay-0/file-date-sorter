@@ -40,61 +40,16 @@ except ImportError:
     HAS_SEND2TRASH = False
 
 
-try:
-    from config import (
-        COMMON_STOPWORDS,
-        DEFAULT_RANDOM_FOLDER_NAME,
-        FILE_CATEGORIES,
-        MONTH_NAMES
-    )
-except ImportError:
-    COMMON_STOPWORDS = {
-        'the', 'a', 'an', 'this', 'that', 'these', 'those',
-        'my', 'your', 'our', 'their', 'his', 'her', 'its'
-    }
-    DEFAULT_RANDOM_FOLDER_NAME = "_Random"
-
-    MONTH_NAMES = {
-        1: "January", 2: "February", 3: "March", 4: "April",
-        5: "May", 6: "June", 7: "July", 8: "August",
-        9: "September", 10: "October", 11: "November", 12: "December"
-    }
-
-    # Pre-defined file category mappings
-    FILE_CATEGORIES = {
-        "Images": ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.heic', '.raw', '.tiff', '.ico', '.cr2', '.nef', '.dng'],
-        "Documents": ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.txt', '.csv', '.cvv', '.tsv', '.md', '.rtf', '.odt', '.ods', '.epub', '.mobi'],
-        "Videos": ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp', '.ts', '.m2ts', '.vob', '.mpg', '.mpeg', '.m2v', '.divx', '.ogv'],
-        "Audio": ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma', '.mid', '.midi', '.3ga', '.amr', '.opus', '.ape', '.wv', '.mka', '.ra'],
-        "Archives": ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.iso', '.img', '.vmdk'],
-        "Design & Graphics": ['.psd', '.ai', '.eps', '.sketch', '.fig', '.xd', '.xcf', '.indd'],
-        "3D Models & CAD": ['.stl', '.obj', '.fbx', '.blend', '.dwg', '.dxf', '.step', '.3ds', '.gcode', '.dae'],
-        "Database & Data": ['.db', '.sqlite', '.sqlite3', '.mdb', '.accdb', '.sql', '.csv', '.cvv', '.tsv', '.json', '.xml'],
-        "Code & Scripts": ['.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json', '.java', '.cpp', '.c', '.h', '.sh', '.bat', '.ps1', '.php', '.rb', '.go', '.rs'],
-        "Fonts": ['.ttf', '.otf', '.woff', '.woff2', '.eot'],
-        "System & Config": ['.ini', '.cfg', '.env', '.yaml', '.yml', '.sys', '.log', '.bak'],
-        "Executables & Installers": ['.exe', '.msi', '.apk', '.dmg', '.deb', '.appimage']
-    }
-
-
-
-def fix_win_long_path(path):
-    """
-    Safely cleans path quotes/whitespace and adds \\\\?\\ prefix on Windows for long paths.
-    """
-    if isinstance(path, str):
-        path = path.strip().strip('\'"')
-        if not path:
-            return ""
-        if sys.platform == 'win32':
-            try:
-                abs_path = os.path.abspath(path)
-                if len(abs_path) >= 240 and not abs_path.startswith("\\\\?\\"):
-                    return "\\\\?\\" + abs_path
-                return abs_path
-            except Exception:
-                return path
-    return path
+from config import (
+    COMMON_STOPWORDS,
+    DEFAULT_RANDOM_FOLDER_NAME,
+    FILE_CATEGORIES,
+    MONTH_NAMES,
+    DEFAULT_PROTECTED_DIRS,
+    FILE_CHUNK_SIZE,
+    WIN_LONG_PATH_THRESHOLD
+)
+from utils import fix_win_long_path
 
 
 def get_extensions_for_categories(categories_list):

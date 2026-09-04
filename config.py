@@ -1,13 +1,32 @@
-﻿"""
+"""
 config.py — Centralized Configuration & Constants
 Smart File Organizer Suite Pro
 
 Defines global constant mappings, regex patterns, stopwords,
-and configurable folder rules.
+system thresholds, and configurable folder rules.
 """
 
 import re
-from typing import Dict, List, Set
+from typing import Dict, List, Pattern, Set
+
+# Windows MAX_PATH threshold (default 260, safe margin at 240)
+WIN_LONG_PATH_THRESHOLD: int = 240
+
+# File chunk size for streaming reads and SHA-256 / MD5 hashing (64 KB)
+FILE_CHUNK_SIZE: int = 65536
+
+# Windows File Attribute bitmasks
+FILE_ATTRIBUTE_READONLY: int = 0x00000001
+FILE_ATTRIBUTE_HIDDEN: int = 0x00000002
+FILE_ATTRIBUTE_SYSTEM: int = 0x00000004
+FILE_ATTRIBUTE_DIRECTORY: int = 0x00000010
+FILE_ATTRIBUTE_ARCHIVE: int = 0x00000020
+FILE_ATTRIBUTE_SPARSE_FILE: int = 0x00000200
+FILE_ATTRIBUTE_REPARSE_POINT: int = 0x00000400
+FILE_ATTRIBUTE_OFFLINE: int = 0x00001000
+FILE_ATTRIBUTE_RECALL_ON_OPEN: int = 0x00040000
+FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: int = 0x00400000
+INVALID_FILE_ATTRIBUTES: int = 0xFFFFFFFF
 
 # Common stopwords stripped only when they appear at the start of filenames
 COMMON_STOPWORDS: Set[str] = {
@@ -50,7 +69,7 @@ DEFAULT_PROTECTED_DIRS: Set[str] = {
 }
 
 # Date detection regex patterns
-DATE_REGEX_PATTERNS = [
+DATE_REGEX_PATTERNS: List[Pattern] = [
     re.compile(r'(\d{4})[-_.](\d{2})[-_.](\d{2})'),       # YYYY-MM-DD
     re.compile(r'(\d{2})[-_.](\d{2})[-_.](\d{4})'),       # DD-MM-YYYY
     re.compile(r'(\d{4})(\d{2})(\d{2})'),                 # YYYYMMDD

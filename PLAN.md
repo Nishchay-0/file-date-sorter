@@ -16,6 +16,7 @@
 | 2026-08-25 | **Stopword-Aware Multi-Word Title Sorting** | Implemented `extract_meaningful_group()` in `sorter_core.py`. Strips leading stopwords (`the`, `a`, `my`, etc.) and preserves multi-word title prefixes before numeric/date patterns (e.g. `_the_june_pearl_...` -> `june_pearl/`, `the_silent_eyes_...` -> `silent_eyes/`). All non-word/hash files consolidated into single `_Random/` folder. 47/47 pytest + 12/12 deployment tests passing (100%). |
 | 2026-08-25 | **Deterministic Prefix-Preserving Grouping Engine** | Overhauled `sorter_core.py` with deterministic token scanning that preserves useful prefixes (`pvt`, `m`, `ser`), skips leading index counters, stops on numeric date stamps, and unifies all random/hash files into a single `_Random/` folder. 14/14 super prompt scenarios + 12/12 deployment tests passing (100%). |
 | 2026-09-04 / `39aa0ae` | **Production Docker Environment** | Added standalone container image (`Dockerfile`), multi-service orchestration (`docker-compose.yml`), smart entrypoint (`docker-entrypoint.sh`), build context ignore (`.dockerignore`), gitattributes LF enforcement, and comprehensive guide (`DOCKER.md`). |
+| 2026-09-04 | **Architecture & Quality Overhaul** | Eliminated code duplication (`fix_win_long_path`, `config.py` constants), added Windows UNC path resilience, centralized logging (`logger.py`), explicit error handling, type annotations, untracked scratch artifacts, and added core unit tests (`test_core_units.py`). |
 
 ---
 

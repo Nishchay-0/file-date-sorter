@@ -47,16 +47,21 @@ def main():
         help="Catch-all folder name for machine-generated / random hash filenames when using smart_name sorting (default: 'Unsorted')."
     )
     parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose debug logging output."
+    )
+    parser.add_argument(
         "-r", "--recursive",
         action="store_true",
         default=True,
-        help="Include subfolders recursively (default: True)."
+        help="Scan directory and all nested subfolders recursively (default: True). Use --no-recursive to limit to top-level folder."
     )
     parser.add_argument(
         "--no-recursive",
         dest="recursive",
         action="store_false",
-        help="Do not scan subfolders."
+        help="Scan only top-level files in the target directory, skipping nested subfolders."
     )
     parser.add_argument(
         "-d", "--date-source",
@@ -131,6 +136,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    import logging
+    from logger import setup_logging
+    setup_logging(level=logging.DEBUG if getattr(args, 'verbose', False) else logging.INFO)
 
     # Handle Headless Watcher Mode
     if args.watch:

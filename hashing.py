@@ -4,10 +4,12 @@ hashing.py - File Hashing and Similarity Utilities for Smart File Organizer Suit
 Provides fast SHA-256 hashing, partial head/tail fast hashing, dHash perceptual image similarity,
 Hamming distance calculations, and fuzzy string similarity.
 """
+import difflib
+import hashlib
 import os
 import sys
-import hashlib
-import difflib
+import threading
+from typing import Any, Dict, List, Optional, Tuple
 
 import ctypes
 
@@ -17,18 +19,24 @@ try:
 except ImportError:
     HAS_PIL = False
 
-# Windows Cloud File Attribute Constants (OneDrive, iCloud, Dropbox, Google Drive)
-FILE_ATTRIBUTE_READONLY = 0x00000001
-FILE_ATTRIBUTE_HIDDEN = 0x00000002
-FILE_ATTRIBUTE_SPARSE_FILE = 0x00000200
-FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400
-FILE_ATTRIBUTE_OFFLINE = 0x00001000
-FILE_ATTRIBUTE_RECALL_ON_OPEN = 0x00040000
-FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x00400000
-INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF
+from config import (
+    FILE_ATTRIBUTE_HIDDEN,
+    FILE_ATTRIBUTE_OFFLINE,
+    FILE_ATTRIBUTE_READONLY,
+    FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS,
+    FILE_ATTRIBUTE_RECALL_ON_OPEN,
+    FILE_ATTRIBUTE_REPARSE_POINT,
+    FILE_ATTRIBUTE_SPARSE_FILE,
+    FILE_CHUNK_SIZE,
+    INVALID_FILE_ATTRIBUTES,
+)
+from logger import get_logger
+from utils import fix_win_long_path
+
+logger = get_logger("Hashing")
 
 
-def is_cloud_placeholder(filepath):
+def is_cloud_placeholder(filepath: str) -> Dict[str, Any]:
     """
     Checks if a file is a cloud-only placeholder stub (e.g. OneDrive, iCloud, Dropbox)
     that is NOT fully cached locally on disk.
@@ -57,8 +65,8 @@ def is_cloud_placeholder(filepath):
     try:
         stat = os.stat(safe_fp)
         result['nominal_size'] = stat.st_size
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Stat error on %s: %s", safe_fp, e)
 
     if sys.platform == 'win32':
         try:
@@ -69,7 +77,6 @@ def is_cloud_placeholder(filepath):
                 is_recall_open = bool(attrs & FILE_ATTRIBUTE_RECALL_ON_OPEN)
                 is_recall_data = bool(attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
                 is_offline = bool(attrs & FILE_ATTRIBUTE_OFFLINE)
-                is_sparse = bool(attrs & FILE_ATTRIBUTE_SPARSE_FILE)
 
                 if is_recall_open or is_recall_data or is_offline:
                     result['is_placeholder'] = True
@@ -78,7 +85,6 @@ def is_cloud_placeholder(filepath):
                 # Secondary check: Allocated clusters on disk vs nominal file size
                 if result['nominal_size'] > 4096:
                     try:
-                        # GetCompressedFileSizeW returns allocated size on disk
                         high_dw = ctypes.c_ulong()
                         low_dw = ctypes.windll.kernel32.GetCompressedFileSizeW(str(safe_fp), ctypes.byref(high_dw))
                         if low_dw != 0xFFFFFFFF or ctypes.GetLastError() == 0:
@@ -87,15 +93,15 @@ def is_cloud_placeholder(filepath):
                             if allocated == 0 or (allocated < 4096 and result['nominal_size'] > 65536):
                                 result['is_placeholder'] = True
                                 result['download_required'] = True
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.debug("GetCompressedFileSizeW error on %s: %s", safe_fp, e)
+        except Exception as e:
+            logger.debug("GetFileAttributesW error on %s: %s", safe_fp, e)
 
     return result
 
 
-def count_cloud_placeholders(filepath_list):
+def count_cloud_placeholders(filepath_list: List[str]) -> Dict[str, int]:
     """
     Summarizes cloud-only placeholders in a list of files.
     Returns dict with count of cloud files and total unhydrated bytes.
@@ -113,7 +119,11 @@ def count_cloud_placeholders(filepath_list):
     }
 
 
-def verify_safe_overwrite(src_path, dst_path, size_threshold_ratio=0.5):
+def verify_safe_overwrite(
+    src_path: str,
+    dst_path: str,
+    size_threshold_ratio: float = 0.5
+) -> Tuple[bool, str]:
     """
     CRITICAL OVERWRITE SAFETY GUARD:
     Prevents silent data loss where a cloud placeholder stub (0-byte/small proxy)
@@ -139,37 +149,23 @@ def verify_safe_overwrite(src_path, dst_path, size_threshold_ratio=0.5):
     if src_placeholder and src_placeholder['is_placeholder'] and src_placeholder['download_required']:
         return False, f"Aborted: Source file '{os.path.basename(src_path)}' is an unhydrated cloud placeholder stub. Overwriting destination would corrupt data."
 
+    # Size ratio sanity check
     if src_path and os.path.exists(fix_win_long_path(src_path)):
         try:
             src_size = os.path.getsize(fix_win_long_path(src_path))
             if dst_size > 102400 and src_size < dst_size * size_threshold_ratio:
                 return False, f"Aborted: Source file size ({src_size:,} bytes) is dramatically smaller than existing destination ({dst_size:,} bytes)."
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Size check error during verify_safe_overwrite: %s", e)
 
     return True, "Overwrite verified safe"
 
 
-def fix_win_long_path(path):
-    """
-    Safely cleans path quotes/whitespace and adds \\\\?\\ prefix on Windows for long paths.
-    """
-    if isinstance(path, str):
-        path = path.strip().strip('\'"')
-        if not path:
-            return ""
-        if sys.platform == 'win32':
-            try:
-                abs_path = os.path.abspath(path)
-                if len(abs_path) >= 240 and not abs_path.startswith("\\\\?\\"):
-                    return "\\\\?\\" + abs_path
-                return abs_path
-            except Exception:
-                return path
-    return path
-
-
-def get_file_hash(filepath, block_size=65536, cancel_event=None):
+def get_file_hash(
+    filepath: str,
+    block_size: int = FILE_CHUNK_SIZE,
+    cancel_event: Optional[threading.Event] = None
+) -> Optional[str]:
     """
     Calculates SHA-256 hash of a file for exact duplicate detection.
 
@@ -178,6 +174,9 @@ def get_file_hash(filepath, block_size=65536, cancel_event=None):
         block_size: Read chunk size in bytes (default 64 KB).
         cancel_event: Optional threading.Event — if set(), hashing aborts and
                       returns None immediately without raising an exception.
+
+    Returns:
+        Hexadecimal SHA-256 digest string, or None if cancelled or an error occurred.
     """
     hasher = hashlib.sha256()
     safe_fp = fix_win_long_path(filepath)
@@ -186,15 +185,30 @@ def get_file_hash(filepath, block_size=65536, cancel_event=None):
             buf = f.read(block_size)
             while len(buf) > 0:
                 if cancel_event is not None and cancel_event.is_set():
-                    return None  # Cancelled by caller
+                    logger.debug("SHA-256 hashing cancelled for %s", safe_fp)
+                    return None
                 hasher.update(buf)
                 buf = f.read(block_size)
         return hasher.hexdigest()
-    except Exception:
+    except FileNotFoundError:
+        logger.debug("File not found during hashing: %s", safe_fp)
+        return None
+    except PermissionError as pe:
+        logger.warning("Permission denied reading file for hash: %s (%s)", safe_fp, pe)
+        return None
+    except OSError as oe:
+        logger.warning("OS error reading file for hash %s: %s", safe_fp, oe)
+        return None
+    except Exception as e:
+        logger.error("Unexpected error calculating SHA-256 on %s: %s", safe_fp, e)
         return None
 
 
-def get_file_fast_hash(filepath, chunk_size=65536, cancel_event=None):
+def get_file_fast_hash(
+    filepath: str,
+    chunk_size: int = FILE_CHUNK_SIZE,
+    cancel_event: Optional[threading.Event] = None
+) -> Optional[str]:
     """
     Computes a quick partial hash (file size + head 64KB + tail 64KB) for rapid candidate pre-screening.
 
@@ -202,6 +216,9 @@ def get_file_fast_hash(filepath, chunk_size=65536, cancel_event=None):
         filepath: Path to the file.
         chunk_size: Head/tail read size in bytes (default 64 KB).
         cancel_event: Optional threading.Event — if set(), hashing aborts and returns None.
+
+    Returns:
+        Hexadecimal MD5 digest string of file sample, 'empty_0' if 0 bytes, or None if error.
     """
     safe_fp = fix_win_long_path(filepath)
     try:
@@ -209,6 +226,7 @@ def get_file_fast_hash(filepath, chunk_size=65536, cancel_event=None):
         if size == 0:
             return "empty_0"
         if cancel_event is not None and cancel_event.is_set():
+            logger.debug("Fast hashing cancelled for %s", safe_fp)
             return None
         hasher = hashlib.md5()
         hasher.update(str(size).encode('utf-8'))
@@ -222,17 +240,35 @@ def get_file_fast_hash(filepath, chunk_size=65536, cancel_event=None):
                 tail = f.read(chunk_size)
                 hasher.update(tail)
         return hasher.hexdigest()
-    except Exception:
+    except FileNotFoundError:
+        logger.debug("File not found during fast hash: %s", safe_fp)
+        return None
+    except PermissionError as pe:
+        logger.warning("Permission denied reading file for fast hash: %s (%s)", safe_fp, pe)
+        return None
+    except OSError as oe:
+        logger.warning("OS error reading file for fast hash %s: %s", safe_fp, oe)
+        return None
+    except Exception as e:
+        logger.error("Unexpected error calculating fast hash on %s: %s", safe_fp, e)
         return None
 
 
-def get_image_perceptual_hash(filepath, hash_size=8):
+def get_image_perceptual_hash(filepath: str, hash_size: int = 8) -> Optional[Dict[str, Any]]:
     """
     Calculates difference hash (dHash) for perceptual visual similarity comparisons.
-    Returns dict with hash integer, hash string, width, height, and megapixels, or None.
+
+    Args:
+        filepath: Path to image file.
+        hash_size: Grid dimension (default 8 for 64-bit dHash).
+
+    Returns:
+        Dictionary with hash integer, hash string, width, height, and megapixels, or None.
     """
     if not HAS_PIL:
+        logger.warning("Pillow (PIL) is not installed; perceptual image hashing is unavailable.")
         return None
+
     safe_fp = fix_win_long_path(filepath)
     try:
         with Image.open(safe_fp) as img:
@@ -247,11 +283,11 @@ def get_image_perceptual_hash(filepath, hash_size=8):
                     left = pixels[row * (hash_size + 1) + col]
                     right = pixels[row * (hash_size + 1) + col + 1]
                     diff.append(1 if left > right else 0)
-            
+
             decimal_val = 0
             for bit in diff:
                 decimal_val = (decimal_val << 1) | bit
-            
+
             return {
                 'hash_int': decimal_val,
                 'hash_str': f"{decimal_val:016x}",
@@ -260,11 +296,12 @@ def get_image_perceptual_hash(filepath, hash_size=8):
                 'megapixels': mp,
                 'res_str': f"{width}x{height} ({mp} MP)"
             }
-    except Exception:
+    except Exception as e:
+        logger.debug("Image perceptual hash failed for '%s': %s", safe_fp, e)
         return None
 
 
-def calculate_hamming_similarity(hash1_int, hash2_int, bits=64):
+def calculate_hamming_similarity(hash1_int: Optional[int], hash2_int: Optional[int], bits: int = 64) -> float:
     """Returns float between 0.0 and 1.0 representing visual similarity percentage."""
     if hash1_int is None or hash2_int is None:
         return 0.0
@@ -274,7 +311,7 @@ def calculate_hamming_similarity(hash1_int, hash2_int, bits=64):
     return max(0.0, min(1.0, similarity))
 
 
-def calculate_fuzzy_name_similarity(name1, name2, ignore_extension=True):
+def calculate_fuzzy_name_similarity(name1: str, name2: str, ignore_extension: bool = True) -> float:
     """Calculates fuzzy similarity ratio between two filenames."""
     n1 = name1.lower()
     n2 = name2.lower()

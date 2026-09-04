@@ -96,8 +96,10 @@ python build_exe.py
 | [`gui.py`](file:///c:/file-date-sorter/gui.py) | Lightweight facade exporting `ModernFileDateSorterGUI`, `SmartFileOrganizerGUI`, and `main` from `gui_modules`. |
 | [`cli.py`](file:///c:/file-date-sorter/cli.py) | Headless command line interface supporting all sorting modes, exclusions, dry-runs, undo, and cleaners. |
 | [`version.py`](file:///c:/file-date-sorter/version.py) | Global constants: `APP_NAME`, `VERSION`, `APP_AUTHOR`, `APP_URL`. |
+| [`config.py`](file:///c:/file-date-sorter/config.py) | Centralized constants: `FILE_CATEGORIES`, `COMMON_STOPWORDS`, `WIN_LONG_PATH_THRESHOLD`, `FILE_CHUNK_SIZE`, attribute bitmasks. |
+| [`logger.py`](file:///c:/file-date-sorter/logger.py) | Centralized logging subsystem provider (`get_logger`, `setup_logging`) with level filtering and formatting. |
 | [`settings_manager.py`](file:///c:/file-date-sorter/settings_manager.py) | JSON config manager (`%LOCALAPPDATA%/SmartFileOrganizer/settings.json`) for watcher preferences and UI defaults. |
-| [`utils.py`](file:///c:/file-date-sorter/utils.py) | Path utility helper with Windows long-path prefixing (`fix_win_long_path`). |
+| [`utils.py`](file:///c:/file-date-sorter/utils.py) | Cross-platform path normalization with Windows extended-length prefixing (`fix_win_long_path`) supporting standard and UNC network shares. |
 
 ### Core Processing Engines
 | File | Responsibility & Key Symbols |
