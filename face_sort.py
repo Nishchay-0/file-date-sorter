@@ -22,7 +22,12 @@ import sys
 import json
 import time
 import shutil
-import numpy as np
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+    np = None
 from datetime import datetime
 
 try:
