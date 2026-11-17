@@ -28,6 +28,8 @@ desktop.ini
 # Scratch & Temporary Test Artifacts
 scratch/
 test_super_duplicates_temp/
+test_folder_advanced/
+backup_before_sort/
 
 # App Cache & Index Files
 .people_cache.json
