@@ -531,7 +531,7 @@ if HAS_CUSTOMTKINTER:
 
             # ── Left Sidebar Toolbar ───────────────────────────────────────────
             self.sidebar = RightSidebarToolbar(main_card, self)
-            self.sidebar.pack(side="left", fill="y", padx=(4, 2), pady=4)
+            self.sidebar.pack(side="left", fill="y", padx=(6, 4), pady=6)
 
             # ── Tab Navigation View ────────────────────────────────────────────
             self.tabview = ctk.CTkTabview(
