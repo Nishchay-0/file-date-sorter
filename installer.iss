@@ -2,7 +2,7 @@
 ; Compile with Inno Setup Compiler (ISCC.exe or Inno Setup GUI)
 
 #define MyAppName "Smart File Organizer Suite"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Nishchay"
 #define MyAppURL "https://github.com/Nishchay-0/file-date-sorter"
 #define MyAppExeName "SmartFileOrganizer.exe"
