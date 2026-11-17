@@ -49,6 +49,20 @@ models/
 .env.local
 *.key
 *.pem
+
+# Flutter & Mobile Artifacts
+.gradle/
+**/.gradle/
+**/build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+local.properties
+*.apk
+*.aab
+
+*.pem
 *.pfx
 *.p12
 credentials.json
