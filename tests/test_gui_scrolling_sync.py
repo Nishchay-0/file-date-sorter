@@ -15,6 +15,9 @@ import gui_modules.app as app_mod
 class TestGUIScrollingSync(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if os.environ.get("CI"):
+            cls.root = None
+            return
         try:
             cls.root = app_mod.ModernFileDateSorterGUI()
             cls.root.withdraw()

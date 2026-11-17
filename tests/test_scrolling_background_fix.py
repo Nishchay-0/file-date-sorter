@@ -33,7 +33,7 @@ class TestScrollingBackgroundFix(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if not TKINTER_AVAILABLE:
+        if os.environ.get("CI") or not TKINTER_AVAILABLE:
             cls.root = None
             return
 

@@ -29,14 +29,25 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Configure Android Scaffolding
-        working-directory: ./flutter_app
-        run: flutter create --platforms=android --org com.nishchay .
-
-      - name: Restore Android Permissions
+      - name: Generate Official Android Platform Files
         working-directory: ./flutter_app
         run: |
-          git checkout android/app/src/main/AndroidManifest.xml || true
+          rm -rf android
+          flutter create --platforms=android --org com.nishchay .
+          python3 -c '
+          p = "android/app/src/main/AndroidManifest.xml"
+          with open(p, "r") as f:
+              content = f.read()
+          perms = """    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+              <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n"""
+          content = content.replace("<application", perms + "    <application")
+          with open(p, "w") as f:
+              f.write(content)
+          '
 
       - name: Get Dependencies
         working-directory: ./flutter_app
@@ -44,12 +55,11 @@ jobs:
 
       - name: Run Dart Unit Tests
         working-directory: ./flutter_app
-        run: flutter test --reporter expanded
-        continue-on-error: true
+        run: flutter test
 
       - name: Build Android APK
         working-directory: ./flutter_app
-        run: flutter build apk --release --no-tree-shake-icons
+        run: flutter build apk --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

@@ -19,6 +19,8 @@ from gui_modules.app import SmartFileOrganizerGUI
 class TestGuiAtomicCheckboxSync(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if os.environ.get("CI"):
+            raise unittest.SkipTest("Skipping interactive Tkinter GUI test on headless CI runner")
         cls.app = SmartFileOrganizerGUI()
         cls.app.withdraw()  # Run headless without displaying window
 
