@@ -1,35 +1,40 @@
-## Running with Docker
+> **This project uses `AGENTS.md` as its primary project-memory file.**
+> Read `AGENTS.md` fully before searching or scanning the codebase.
 
-The project can be built, tested, and run inside a Docker container to guarantee a reproducible environment.
+# Smart File Organizer Suite Pro — CLAUDE.md
 
-**Typical workflow**
+This file exists as a companion/redirect. All module maps, run commands, working rules, and constraints are in:
+
+- **[AGENTS.md](AGENTS.md)** — full project guide, module map, working rules digest
+- **[PLAN.md](PLAN.md)** — living roadmap (done / in-progress / planned)
+- **[docs/known-issues.md](docs/known-issues.md)** — confirmed bugs and fixes with evidence
+- **[docs/constraints.md](docs/constraints.md)** — hard rules and runtime decisions
+
+---
+
+## Runtime: Native (not Docker)
+
+This project targets a Windows desktop GUI with OS-specific APIs (cloud-placeholder file attributes, Windows registry, Tkinter/CustomTkinter, Inno Setup installer). Per Part 11 of the working agreement, **Docker does not fit as the primary runtime** for this project. See `docs/constraints.md` for the full rationale.
+
+**Native environment:**
 ```powershell
-# Build the image (run once or after Dockerfile changes)
-docker compose build
+# Activate venv
+& "C:\file-date-sorter\.venv\Scripts\Activate.ps1"
 
-# Start the container (detached)
-docker compose up -d
+# Run GUI
+python run_sorter.py
 
-# Run the GUI (or CLI) inside the container
-# GUI (requires display forwarding on Windows; see Docker docs for X server setup)
-docker compose exec app python gui.py
-
-# Run the CLI
-# Example: sort a folder
-
-docker compose exec app python cli.py --path C:\\Target\\Path --sort-category date
-
-# Run the test suite
-
-docker compose exec app pytest -v
-
-# Stop and clean up
-
-docker compose down
+# Run tests
+$env:TCL_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python315\tcl\tcl8.6"
+$env:TK_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python315\tcl\tk8.6"
+& "C:\file-date-sorter\.venv\Scripts\python.exe" -m pytest -v
 ```
 
-**Notes**
-- The source directory is mounted as a volume (`.:/app:cached`), so changes you make on the host are reflected inside the container without rebuilding.
-- No ports are exposed by default because the application is a desktop GUI; if you add a web service later, expose it via the `ports:` section in `docker‑compose.yml`.
-- All development commands (build, test, lint, etc.) should be executed via `docker compose exec app <cmd>` as enforced by `docs/constraints.md`.
-- If Docker is not installed, see the Docker detection step in the startup script (to be added) which will prompt the user to install Docker before proceeding.
+## Docker (CI-only, not for GUI)
+
+Docker is used **only** for the CI pipeline (secret scan, headless CLI tests). It cannot run the desktop GUI. If Docker is not installed, the CI workflow handles it; local development always uses the native `.venv`.
+
+```powershell
+# CI-equivalent local test (headless CLI tests only)
+docker compose run --rm test
+```

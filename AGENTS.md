@@ -2,6 +2,24 @@ AGENT DIRECTIVE: Read this file fully before searching or scanning the codebase.
 
 # Smart File Organizer Suite Pro — Working Agreement & Project Guide
 
+## ⚡ Working Rules (digest — follow in every session)
+
+1. **Never share user data** with any external service; audit deps and network calls, don't just assert.
+2. **No irreversible action without a reversible path** — backup zip + `.undo_manifest.json` first, always.
+3. **Informed consent before costly/slow actions** — state estimated cost/time before starting.
+4. **Least privilege** — read/mount only what the task needs; no whole-home mounts.
+5. **Don't change public interfaces** (CLI flags, function signatures, GUI APIs) without explicit instruction.
+6. **Don't silently degrade** — surface missing models, permission errors, fallbacks visibly.
+7. **Reproduce before fixing** — ordered hypothesis list, most-likely first; state which one it was.
+8. **Fix root cause, not symptom** — check for the same pattern everywhere; one fix, not N patches.
+9. **Stay scoped** — don't refactor unrelated code; note other issues separately.
+10. **Every bug fix ships with a regression test.**
+11. **Don't build on a failing baseline** — run tests first; smoke-test actual output, not just exit 0.
+12. **Finish-of-task checklist** — list every file asked for; call out anything not delivered explicitly.
+13. **Verify with evidence** — state what was checked vs. assumed; never report "working" without checking.
+14. **Ambiguous request → stop and ask**, don't silently pick one path.
+15. **End every session** with a handoff note in `PLAN.md`; update this file if new structure was discovered.
+
 ## 🚨 Critical Non-Negotiable Hard Constraints
 
 1. **Personal Data Protection & Zero-PII Leakage Policy (STRICT)**: Never commit or push personal data (PII) including real names, emails, credentials, user databases, or personal media. Use synthetic or anonymized fixtures only.
@@ -21,11 +39,11 @@ AGENT DIRECTIVE: Read this file fully before searching or scanning the codebase.
 ```
 PROJECT: Smart File Organizer Suite Pro
 PURPOSE: High-performance desktop GUI & CLI utility for organizing, deduplicating, batch renaming, converting, and indexing files and media across deep directory hierarchies with face recognition and system vault backup/undo.
-STACK: Python 3.11+, CustomTkinter, OpenCV (YuNet/SFace), ONNX Runtime, scikit-learn (DBSCAN), Pillow, Send2Trash, Watchdog, PyInstaller, Inno Setup
+STACK: Python 3.15+, CustomTkinter, OpenCV (YuNet/SFace), ONNX Runtime, scikit-learn (DBSCAN), Pillow, Send2Trash, Watchdog, PyInstaller, Inno Setup
 HOW TO RUN:
   - GUI: python run_sorter.py or python gui.py
   - CLI: python cli.py --help
-  - Tests: $env:TCL_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python314\tcl\tcl8.6"; $env:TK_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python314\tcl\tk8.6"; py -3.14 -m pytest -v
+  - Tests: $env:TCL_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python315\tcl\tcl8.6"; $env:TK_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python315\tcl\tk8.6"; & "C:\file-date-sorter\.venv\Scripts\python.exe" -m pytest -v
   - Build exe: python build_exe.py
   - Build installer: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 HARD CONSTRAINTS: Always commit & push to GitHub; Zero data loss (System Vault undo); Cloud safe mode; Windows-first long paths; No telemetry; Exact dry-run match.
@@ -71,9 +89,9 @@ docker compose run --rm test
 
 ### Test Suite Execution
 ```powershell
-$env:TCL_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python314\tcl\tcl8.6"
-$env:TK_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python314\tcl\tk8.6"
-py -3.14 -m pytest -v
+$env:TCL_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python315\tcl\tcl8.6"
+$env:TK_LIBRARY="C:\Users\saini\AppData\Local\Programs\Python\Python315\tcl\tk8.6"
+& "C:\file-date-sorter\.venv\Scripts\python.exe" -m pytest -v
 ```
 
 ### Production Build & Packaging
