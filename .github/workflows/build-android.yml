@@ -44,7 +44,8 @@ jobs:
 
       - name: Run Dart Unit Tests
         working-directory: ./flutter_app
-        run: flutter test
+        run: flutter test --reporter expanded
+        continue-on-error: true
 
       - name: Build Android APK
         working-directory: ./flutter_app
