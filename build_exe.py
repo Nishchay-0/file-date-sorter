@@ -1,5 +1,5 @@
 """
-Build Script for Smart File Organizer Suite
+Build Script for Smart File Organizer Suite Pro
 Converts the CustomTkinter GUI into a standalone Windows .exe using PyInstaller.
 """
 
@@ -11,7 +11,7 @@ try:
     from version import APP_NAME, VERSION
 except ImportError:
     APP_NAME = "Smart File Organizer Suite"
-    VERSION = "1.0.0"
+    VERSION = "1.0.1"
 
 def sign_executable(exe_path, cert_pfx_path=None, cert_password=None):
     """
@@ -78,23 +78,26 @@ def build_executable():
         "gui.py"
     ]
 
-    print(f"[+] Executing command: {' '.join(cmd)}")
-    ret = subprocess.call(cmd)
-    
-    if ret == 0:
-        exe_output = os.path.abspath("dist/SmartFileOrganizer/SmartFileOrganizer.exe")
-        print("\n==========================================================")
-        print("[SUCCESS] BUILD SUCCESSFUL!")
-        print(f"Standalone application folder created in: {os.path.abspath('dist/SmartFileOrganizer')}")
-        print(f"Executable: {exe_output}")
-        print("==========================================================")
+    print("\n[+] Running PyInstaller compilation command:")
+    print(" ".join(cmd))
+    print("-" * 58)
 
-        # Trigger code-signing hook (no-op unless certificate path is supplied)
-        cert_path = os.environ.get("CODE_SIGNING_CERT_PATH")
+    subprocess.check_call(cmd)
+
+    output_exe = os.path.join("dist", "SmartFileOrganizer", "SmartFileOrganizer.exe")
+    if os.path.exists(output_exe):
+        print("\n" + "=" * 58)
+        print(" [✓] BUILD SUCCEEDED!")
+        print(f" [✓] Executable: {os.path.abspath(output_exe)}")
+        print("=" * 58)
+        
+        # Optional code signing
+        cert_pfx = os.environ.get("CODE_SIGNING_CERT_PFX")
         cert_pass = os.environ.get("CODE_SIGNING_CERT_PASS")
-        sign_executable(exe_output, cert_pfx_path=cert_path, cert_password=cert_pass)
+        if cert_pfx:
+            sign_executable(output_exe, cert_pfx, cert_pass)
     else:
-        print("\n[!] Build failed with return code:", ret)
+        print("\n[!] Build completed, but could not verify target executable at expected path.")
 
 if __name__ == "__main__":
     build_executable()

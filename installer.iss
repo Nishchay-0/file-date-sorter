@@ -1,4 +1,4 @@
-; Inno Setup Compiler Script (.iss) for Smart File Organizer Suite
+; Inno Setup Compiler Script (.iss) for Smart File Organizer Suite Pro
 ; Compile with Inno Setup Compiler (ISCC.exe or Inno Setup GUI)
 
 #define MyAppName "Smart File Organizer Suite"
@@ -18,8 +18,8 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-LicenseFile=README.md
-OutputBaseFilename=SmartFileOrganizer_Setup_v1.0.0
+LicenseFile=LICENSE
+OutputBaseFilename=SmartFileOrganizer_Setup_v1.0.1
 OutputDir=installer_output
 SetupIconFile=assets\icon.ico
 Compression=lzma2/ultra64

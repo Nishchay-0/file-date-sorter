@@ -5,9 +5,7 @@ watchdog>=3.0.0
 pystray>=0.19.0
 
 # Face-Based People Sorter (ONNX Runtime + OpenCV + DBSCAN Clustering)
-# Note: ONNX Runtime + OpenCV avoid dlib C++ compilation issues & installer bloat (~25-35MB exe impact).
-onnxruntime>=1.14.0
+onnxruntime>=1.14.0; python_version < "3.15"
 opencv-python>=4.6.0
 scikit-learn>=1.0.0
 numpy>=1.21.0
-

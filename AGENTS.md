@@ -146,17 +146,20 @@ python build_exe.py
 | [`gui_modules/views/tab_people.py`](file:///c:/file-date-sorter/gui_modules/views/tab_people.py) | Face recognition manager, person tagging, face thumbnail viewer, shortcut generator. |
 | [`gui_modules/views/tab_watcher.py`](file:///c:/file-date-sorter/gui_modules/views/tab_watcher.py) | Background folder monitoring controls and real-time event log viewer. |
 
-### Build & Spec Artifacts
+### Build & Packaging Artifacts
 | File | Responsibility |
 | :--- | :--- |
 | [`Dockerfile`](file:///c:/file-date-sorter/Dockerfile) | Production container specification based on Python 3.11-slim with OpenCV, ONNX, and Tkinter runtime. |
 | [`docker-compose.yml`](file:///c:/file-date-sorter/docker-compose.yml) | Multi-service compose config for `sorter` (CLI), `test` (pytest), and `shell` (interactive). |
-| [`docker-entrypoint.sh`](file:///c:/file-date-sorter/docker-entrypoint.sh) | Container entrypoint script routing CLI flags, test runner, and shell commands. |
+| [`scripts/docker-entrypoint.sh`](file:///c:/file-date-sorter/scripts/docker-entrypoint.sh) | Container entrypoint script routing CLI flags, test runner, and shell commands. |
 | [`.dockerignore`](file:///c:/file-date-sorter/.dockerignore) | Docker build context exclusions for lightweight image generation. |
-| [`DOCKER.md`](file:///c:/file-date-sorter/DOCKER.md) | Comprehensive usage guide for running, testing, and mounting volumes in Docker. |
+| [`docs/DOCKER.md`](file:///c:/file-date-sorter/docs/DOCKER.md) | Comprehensive usage guide for running, testing, and mounting volumes in Docker. |
 | [`build_exe.py`](file:///c:/file-date-sorter/build_exe.py) | PyInstaller automation script with asset bundling and optional code-signing hooks. |
-| [`SmartFileOrganizer.spec`](file:///c:/file-date-sorter/SmartFileOrganizer.spec) | PyInstaller specification definition. |
 | [`installer.iss`](file:///c:/file-date-sorter/installer.iss) | Inno Setup Windows installer compilation script. |
+| [`requirements.txt`](file:///c:/file-date-sorter/requirements.txt) | Pinned production runtime dependencies. |
+| [`requirements-dev.txt`](file:///c:/file-date-sorter/requirements-dev.txt) | Development, testing, and linting dependencies. |
+| [`pyproject.toml`](file:///c:/file-date-sorter/pyproject.toml) | Standard PEP 518/621 package build configuration. |
+| [`tests/`](file:///c:/file-date-sorter/tests) | Complete 19-suite test directory executed by pytest. |
 
 ---
 
