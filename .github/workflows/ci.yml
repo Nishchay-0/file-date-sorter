@@ -7,21 +7,31 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  test:
+    name: Python Test Suite
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: Build Docker image
+      - name: Install System Dependencies
         run: |
-          docker compose build
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgtk-3-0
 
-      - name: Run tests inside Docker
+      - name: Install Python Dependencies
         run: |
-          docker compose up -d
-          docker compose exec app pytest -v
-          docker compose down
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run Pytest Suite
+        run: |
+          pytest -v

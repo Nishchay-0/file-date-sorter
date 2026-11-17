@@ -29,6 +29,15 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Configure Android Scaffolding
+        working-directory: ./flutter_app
+        run: flutter create --platforms=android --org com.nishchay .
+
+      - name: Restore Android Permissions
+        working-directory: ./flutter_app
+        run: |
+          git checkout android/app/src/main/AndroidManifest.xml || true
+
       - name: Get Dependencies
         working-directory: ./flutter_app
         run: flutter pub get

@@ -12,8 +12,8 @@ void main() {
 
     test('extractMeaningfulGroup strips leading numbers and stopwords', () {
       expect(SmartNameSorter.extractMeaningfulGroup('01 - The Invoice Report.pdf'), 'Invoice Report');
-      expect(SmartNameSorter.extractMeaningfulGroup('a new document.docx'), 'Document');
-      expect(SmartNameSorter.extractMeaningfulGroup('IMG_20240101_123456.jpg'), 'IMG');
+      expect(SmartNameSorter.extractMeaningfulGroup('a new document.docx'), 'New Document');
+      expect(SmartNameSorter.extractMeaningfulGroup('IMG_20240101_123456.jpg'), 'Img');
     });
 
     test('extractMeaningfulGroup routes random hashes to _Random', () {

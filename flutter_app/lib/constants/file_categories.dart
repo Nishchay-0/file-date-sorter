@@ -47,15 +47,9 @@ class FileCategories {
     ]
   };
 
-  /// Common stopwords stripped during Smart Name Grouping (Ported from sorter_core.py)
+  /// Common stopwords stripped during Smart Name Grouping (Ported exactly from config.py)
   static const Set<String> commonStopwords = {
-    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-    'of', 'with', 'by', 'from', 'up', 'about', 'into', 'over', 'after',
-    'my', 'your', 'our', 'their', 'his', 'her', 'its', 'this', 'that',
-    'these', 'those', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'new', 'final', 'copy',
-    'complete', 'download', 'upload', 'version', 'scan', 'doc', 'document',
-    'img', 'image', 'photo', 'picture', 'file'
+    'a', 'an', 'her', 'his', 'its', 'my', 'our', 'that', 'the', 'their', 'these', 'this', 'those', 'your'
   };
 
   /// Map an extension to its Category Name

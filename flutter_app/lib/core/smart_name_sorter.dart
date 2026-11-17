@@ -3,9 +3,8 @@ import '../constants/file_categories.dart';
 /// Smart Name Sorting & Deterministic Token Extraction
 /// Direct high-performance Dart port of sorter_core.py:extract_meaningful_group
 class SmartNameSorter {
-  static final RegExp _hexOrUuidRegex = RegExp(r'^[a-fA-F0-9\-_]{8,}$');
-  static final RegExp _digitOnlyRegex = RegExp(r'^\d+$');
-  static final RegExp _datePattern = RegExp(r'^\d{4}[-_]?\d{2}[-_]?\d{2}$');
+  static final RegExp _uuidRegex = RegExp(r'^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$');
+  static final RegExp _hexHashRegex = RegExp(r'^[a-fA-F0-9]{12,}$');
 
   /// Natural Sort Key: sorts alphanumeric strings numerically (e.g. file_2 before file_10)
   static int naturalCompare(String a, String b) {
@@ -54,59 +53,87 @@ class SmartNameSorter {
   }
 
   /// Extracts the meaningful group/topic folder from a filename
-  /// Strips leading numbers, stopwords, dates, and routes pure hashes to _Random/
+  /// Ported directly from sorter_core.py:extract_meaningful_group
   static String extractMeaningfulGroup(String filename, {String randomFolder = '_Random'}) {
-    // Strip extension
+    if (filename.isEmpty) return randomFolder;
+
+    // Stem without extension
     final dotIdx = filename.lastIndexOf('.');
-    final nameWithoutExt = dotIdx > 0 ? filename.substring(0, dotIdx) : filename;
+    final stem = dotIdx > 0 ? filename.substring(0, dotIdx).trim() : filename.trim();
+    if (stem.isEmpty) return randomFolder;
 
-    // Normalize separators
-    final normalized = nameWithoutExt
-        .replaceAll(RegExp(r'[\._\-\+]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-
-    if (normalized.isEmpty) return randomFolder;
-
-    // Check if filename is purely hex / UUID / MD5 / SHA hash
-    if (_hexOrUuidRegex.hasMatch(nameWithoutExt.replaceAll(RegExp(r'[\-_]'), ''))) {
+    // Check UUID or pure numeric without separator
+    final cleanNoSep = stem.replaceAll(RegExp(r'[\s_\-\.]'), '');
+    if (RegExp(r'^\d+$').hasMatch(cleanNoSep) || _uuidRegex.hasMatch(stem)) {
       return randomFolder;
     }
 
-    final words = normalized.split(' ');
-    final candidateWords = <String>[];
-
-    for (int i = 0; i < words.length; i++) {
-      final word = words[i].trim();
-      if (word.isEmpty) continue;
-
-      // Skip leading numeric index (e.g. "01 - MyFile" -> skips "01")
-      if (candidateWords.isEmpty && _digitOnlyRegex.hasMatch(word)) {
-        continue;
+    // Hex hash >= 12 chars without clear alphabetic token >= 3 chars
+    if (_hexHashRegex.hasMatch(cleanNoSep) && cleanNoSep.contains(RegExp(r'\d')) && cleanNoSep.contains(RegExp(r'[a-zA-Z]'))) {
+      final tokensAll = RegExp(r'[a-zA-Z]+').allMatches(stem).map((m) => m.group(0)!).toList();
+      if (!tokensAll.any((t) => t.length >= 3)) {
+        return randomFolder;
       }
-
-      // Stop on date stamps (e.g. "Invoice 2024-05-12" -> "Invoice")
-      if (_datePattern.hasMatch(word)) {
-        break;
-      }
-
-      final lowerWord = word.toLowerCase();
-      // Skip leading stopwords
-      if (candidateWords.isEmpty && FileCategories.commonStopwords.contains(lowerWord)) {
-        continue;
-      }
-
-      candidateWords.add(word);
-      // Group by the first 1-2 meaningful topical words
-      if (candidateWords.length >= 2) break;
     }
 
-    if (candidateWords.isEmpty) {
+    // Interleaved hash/random alphanumeric strings (e.g. 323f9w8ehf8awjefi, 4f8a2c9e1b)
+    if (RegExp(r'\d+[a-zA-Z]+\d+[a-zA-Z]+|\d+[a-zA-Z]\d+').hasMatch(stem)) {
       return randomFolder;
     }
 
-    // Capitalize Title Case
-    return candidateWords
+    // Random consonant gibberish
+    final alphaOnly = stem.replaceAll(RegExp(r'[^a-zA-Z]'), '').toLowerCase();
+    if (alphaOnly.length >= 8 && !alphaOnly.contains(RegExp(r'[aeiou]'))) {
+      return randomFolder;
+    }
+
+    // Normalize separators into single _
+    final norm = stem.replaceAll(RegExp(r'[\s_\-\.]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '');
+    if (norm.isEmpty) return randomFolder;
+
+    final tokens = norm.split('_');
+    final prefixParts = <String>[];
+    bool started = false;
+
+    for (final tok in tokens) {
+      if (tok.isEmpty) continue;
+
+      if (RegExp(r'^\d+$').hasMatch(tok)) {
+        if (started) {
+          break; // Stop scanning on date/number after title
+        } else {
+          continue; // Skip leading counter
+        }
+      }
+
+      final alphaParts = RegExp(r'[a-zA-Z]+').allMatches(tok).map((m) => m.group(0)!).toList();
+      if (alphaParts.isEmpty) {
+        if (started) break; else continue;
+      }
+
+      for (final ap in alphaParts) {
+        prefixParts.add(ap);
+        started = true;
+      }
+    }
+
+    if (prefixParts.isEmpty) return randomFolder;
+
+    // Strip leading stopwords
+    while (prefixParts.isNotEmpty && FileCategories.commonStopwords.contains(prefixParts.first.toLowerCase())) {
+      prefixParts.removeAt(0);
+    }
+
+    if (prefixParts.isEmpty) return randomFolder;
+
+    // Minimum length rule: joined length >= 3 and at least one token >= 2
+    final joined = prefixParts.join(' ');
+    if (joined.length < 3 || !prefixParts.any((p) => p.length >= 2)) {
+      return randomFolder;
+    }
+
+    // Title case formatting
+    return prefixParts
         .map((w) => w.length > 1 ? '${w[0].toUpperCase()}${w.substring(1)}' : w.toUpperCase())
         .join(' ');
   }
