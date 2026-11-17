@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python / Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / Editor configs
+.vscode/
+.idea/
+.continue/
+.specify/
+
+# PyInstaller / Inno Setup builds
+build/
+dist/
+installer_output/
+*.spec
+*.manifest
+
+# Temporary test data & local caches
+test_super_duplicates_temp/
+.people_cache.json
+.undo_manifest.json
+*.log
+scratch/
+
+# Documentation / Large non-runtime files
+docs/
