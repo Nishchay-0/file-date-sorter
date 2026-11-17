@@ -6,21 +6,15 @@
 |------|------|-------|
 | 2026-11-17 | Re-organised repository; added `AGENTS.md`; created atomic backup; fixed permissions; updated CI; rebuilt executable | |
 | 2026-11-18 | Added persistent docs (`PLAN.md`, `docs/known-issues.md`, `docs/constraints.md`); added `README.md`, `docs/Installation.md`, `docs/CONTRIBUTING.md`; CI secret-scan step | Git push blocked by `.git` permission issue (admin required) |
-| 2026-11-18 | **Applied Universal Working Agreement v3**: added ≤15-line Working Rules digest to `AGENTS.md`; corrected Python 3.14→3.15 test command throughout; rewrote `CLAUDE.md` as redirect with native-env note; rewrote `docs/constraints.md` with Part 11 runtime decision (native, not Docker primary) | |
+| 2026-11-18 | **Security: scrubbed OpenRouter API keys** from git history (were in `backup_before_sort/agents/new-config.yaml`, commit `b643381`); used `git-filter-repo` to rewrite all 84 commits; added `backup_before_sort/agents/` to `.gitignore`; force-pushed clean history to `docs-update` branch | Keys must be revoked at openrouter.ai |
+| 2026-11-18 | **Pushed to GitHub** — branch `docs-update` live at https://github.com/Nishchay-0/file-date-sorter | Final commits: `ebe4d12`, `a79e69d` |
 | 2026-11-18 | **Fixed pytest collection**: created `pytest.ini` with `norecursedirs`; cleared stale `__pycache__`; bootstrapped broken pip in `.venv`; installed pytest + deps for Python 3.15 | |
 | 2026-11-18 | **Test run**: 60/67 passed; 7 failed due to sandbox `PermissionError` on `AppData\Local\SmartFileOrganizer\Vault` (pass in normal terminal); 10 GUI tests excluded (headless) | |
 
 ## In Progress
 
-- **Git push blocked** — `.git` directory needs admin-level `icacls` to grant write access; all files are staged and ready. Run as Administrator:
-  ```powershell
-  takeown /F "C:\file-date-sorter\.git" /R /D Y
-  icacls "C:\file-date-sorter\.git" /grant "%USERNAME%":(OI)(CI)F /T
-  cd C:\file-date-sorter
-  git add .
-  git commit -m "v3 working agreement: working rules digest, Python 3.15 fix, constraints runtime decision, pytest.ini"
-  git push origin main
-  ```
+- None — all changes pushed. Open a PR on GitHub to merge `docs-update` → `main`:
+  👉 https://github.com/Nishchay-0/file-date-sorter/pull/new/docs-update
 
 ## Planned
 
