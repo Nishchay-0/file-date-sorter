@@ -52,3 +52,7 @@ models/
 credentials.json
 config_local.json
 CODE_SIGNING_CERT_*
+
+# Credential files in backup snapshots
+backup_before_sort/agents/
+backup_before_sort/agents/**
