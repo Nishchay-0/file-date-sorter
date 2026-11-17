@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/core/smart_name_sorter.dart';
-import '../lib/constants/file_categories.dart';
+import 'package:smart_file_organizer/core/smart_name_sorter.dart';
+import 'package:smart_file_organizer/constants/file_categories.dart';
 
 void main() {
   group('SmartNameSorter Tests', () {
