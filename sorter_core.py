@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import subprocess
 import shutil
 import json
@@ -80,15 +81,30 @@ def get_system_vault_dir(subfolder=""):
     Windows: C:\\Users\\<user>\\AppData\\Local\\SmartFileOrganizer\\Vault\\...
     Mac/Linux: ~/.config/smart_file_organizer/vault/...
     This directory is isolated from user target folders so files can NEVER be accidentally deleted!
+    If AppData is restricted/sandboxed, falls back to tempdir/local vault.
     """
+    custom_vault = os.environ.get('SMART_FILE_ORGANIZER_VAULT_DIR')
+    if custom_vault:
+        vault_path = os.path.join(custom_vault, subfolder) if subfolder else custom_vault
+        os.makedirs(fix_win_long_path(vault_path), exist_ok=True)
+        return vault_path
+
     if sys.platform == 'win32':
         base = os.environ.get('LOCALAPPDATA') or os.path.expanduser("~\\AppData\\Local")
     else:
         base = os.path.expanduser("~/.config")
 
     vault_path = os.path.join(base, "SmartFileOrganizer", "Vault", subfolder)
-    os.makedirs(fix_win_long_path(vault_path), exist_ok=True)
-    return vault_path
+    try:
+        os.makedirs(fix_win_long_path(vault_path), exist_ok=True)
+        return vault_path
+    except (PermissionError, OSError):
+        # Fallback for sandboxed environments, restricted user permissions, or containers
+        fallback_base = os.path.join(tempfile.gettempdir(), "SmartFileOrganizer_Vault")
+        fallback_path = os.path.join(fallback_base, subfolder) if subfolder else fallback_base
+        os.makedirs(fix_win_long_path(fallback_path), exist_ok=True)
+        return fallback_path
+
 
 
 def hide_path_windows(path):
