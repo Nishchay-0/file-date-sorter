@@ -400,9 +400,11 @@ class ConnectedDevicesDialog(ctk.CTkToplevel if HAS_CTK else object):
         btn_entire.pack(side="left", padx=2)
 
     def _pick_folder_in_drive(self, drive_path):
+        # Ensure the drive path is a proper absolute path for the dialog
+        normalized = os.path.abspath(drive_path)
         folder = filedialog.askdirectory(
-            initialdir=drive_path,
-            title=f"Select Target Folder on {drive_path}",
+            initialdir=normalized,
+            title=f"Select Target Folder on {normalized}",
             parent=self
         )
         if folder:
@@ -521,15 +523,26 @@ def show_devices_dropdown_menu(gui_instance, source_button):
         menu.post(200, 200)
 
 
-def _menu_pick_folder(gui_instance, drive_path):
-    folder = filedialog.askdirectory(
-        initialdir=drive_path,
-        title=f"Select Target Folder on {drive_path}",
-        parent=gui_instance
-    )
-    if folder:
-        gui_instance.selected_individual_files = []
-        gui_instance.set_target_dir(folder)
+    def _menu_pick_folder(gui_instance, drive_path):
+        """Open a folder picker rooted at the given drive path and update the GUI.
+        The selected folder becomes the target directory for organizing files.
+        """
+        try:
+            normalized = os.path.abspath(drive_path)
+        except Exception:
+            normalized = drive_path
+
+        folder = filedialog.askdirectory(
+            initialdir=normalized,
+            title=f"Select Target Folder on {normalized}",
+            parent=gui_instance
+        )
+        if folder:
+            gui_instance.selected_individual_files = []
+            gui_instance.set_target_dir(folder)
+            gui_instance.dir_var.set(folder)
+            gui_instance.refresh_preview()
+
 
 
 def _menu_pick_files(gui_instance, drive_path):

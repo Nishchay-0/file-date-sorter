@@ -867,7 +867,46 @@ if HAS_CUSTOMTKINTER:
 
         # Delegates to handlers defined in view / core modules
         def browse_individual_files(self):
-            files = filedialog.askopenfilenames(title="Select Specific Files to Organize")
+            """Pick files from local or any connected removable/external drive.
+            If removable drives are present, the user is prompted to choose one as the
+            initial directory for the file dialog. Otherwise it falls back to the
+            standard local picker.
+            """
+            # Detect removable / external drives (including fixed partitions)
+            try:
+                from gui_modules.device_selector import UnifiedDeviceManager
+                mgr = UnifiedDeviceManager()
+                devs = mgr.scan_all_connected_devices()
+                removable = devs.get('removable_drives', []) + devs.get('fixed_drives', [])
+            except Exception:
+                removable = []
+
+            init_dir = None
+            if removable:
+                # Simple numbered prompt using tkinter.simpledialog
+                from tkinter import simpledialog
+                options = "\n".join([f"{i+1}. {d.label} ({d.path.rstrip('\\\\')})" for i, d in enumerate(removable)])
+                choice = simpledialog.askstring(
+                    "Select Drive",
+                    f"Choose a drive for file selection (or cancel for local):\n{options}",
+                    parent=self
+                )
+                if choice and choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(removable):
+                        init_dir = removable[idx].path
+
+            if init_dir:
+                files = filedialog.askopenfilenames(
+                    initialdir=init_dir,
+                    title="Select Specific Files to Organize",
+                    parent=self
+                )
+            else:
+                files = filedialog.askopenfilenames(
+                    title="Select Specific Files to Organize",
+                    parent=self
+                )
             if files:
                 self.selected_individual_files = list(files)
                 dir_name = os.path.dirname(files[0])
@@ -875,7 +914,44 @@ if HAS_CUSTOMTKINTER:
                 self.refresh_preview()
 
         def browse_folder(self):
-            selected_dir = filedialog.askdirectory(title="Select Target Folder to Organize")
+            """Pick a target folder from local or any connected removable/external drive.
+            If removable drives are detected, the user can choose one first; otherwise the
+            standard local folder picker is shown.
+            """
+            # Detect removable / external drives (including fixed partitions)
+            try:
+                from gui_modules.device_selector import UnifiedDeviceManager
+                mgr = UnifiedDeviceManager()
+                devs = mgr.scan_all_connected_devices()
+                removable = devs.get('removable_drives', []) + devs.get('fixed_drives', [])
+            except Exception:
+                removable = []
+
+            init_dir = None
+            if removable:
+                from tkinter import simpledialog
+                options = "\n".join([f"{i+1}. {d.label} ({d.path.rstrip('\\\\')})" for i, d in enumerate(removable)])
+                choice = simpledialog.askstring(
+                    "Select Drive",
+                    f"Choose a drive for folder selection (or cancel for local):\n{options}",
+                    parent=self
+                )
+                if choice and choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(removable):
+                        init_dir = removable[idx].path
+
+            if init_dir:
+                selected_dir = filedialog.askdirectory(
+                    initialdir=init_dir,
+                    title="Select Target Folder to Organize",
+                    parent=self
+                )
+            else:
+                selected_dir = filedialog.askdirectory(
+                    title="Select Target Folder to Organize",
+                    parent=self
+                )
             if selected_dir:
                 self.selected_individual_files = []
                 self.set_target_dir(selected_dir)
