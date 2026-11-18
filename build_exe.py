@@ -47,6 +47,7 @@ def build_executable(onefile=True):
 
     icon_path = os.path.abspath(os.path.join("assets", "icon.ico"))
     assets_data = f"{os.path.abspath('assets')}{os.path.pathsep}assets"
+    scripts_data = f"{os.path.abspath('scripts')}{os.path.pathsep}scripts"
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -57,9 +58,12 @@ def build_executable(onefile=True):
         "--name=SmartFileOrganizer",
         f"--icon={icon_path}",
         f"--add-data={assets_data}",
+        f"--add-data={scripts_data}",
         "--collect-all=customtkinter",
         "--collect-all=gui_modules",
         "--hidden-import=gui_modules",
+        "--hidden-import=gui_modules.phone_dialog",
+        "--hidden-import=device_bridge",
         "--hidden-import=sorter_core",
         "--hidden-import=version",
         "--hidden-import=PIL",

@@ -7,6 +7,7 @@ Verifies:
 3. Master scroll engine binding hygiene (MouseWheel, Button-4, Button-5).
 """
 
+import os
 import unittest
 import tkinter as tk
 import gui_modules.app as app_mod

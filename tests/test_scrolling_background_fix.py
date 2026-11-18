@@ -15,6 +15,7 @@ This test verifies:
 3. Active tab can be determined correctly
 """
 
+import os
 import unittest
 import sys
 import tkinter as tk

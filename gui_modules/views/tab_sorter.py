@@ -21,6 +21,12 @@ try:
 except ImportError:
     HAS_THEME = False
 
+try:
+    from gui_modules.phone_dialog import open_phone_manager
+    HAS_PHONE_DIALOG = True
+except ImportError:
+    HAS_PHONE_DIALOG = False
+
 
 def setup_organizer_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_organizer, fg_color="transparent")
@@ -83,6 +89,21 @@ def setup_organizer_tab(gui_instance):
             text_color=("gray10", "gray90")
         )
         btn_sc.pack(side="left", padx=2)
+
+    if HAS_PHONE_DIALOG:
+        btn_phone = ctk.CTkButton(
+            quick_frame,
+            text="📱 Phone (USB)...",
+            command=lambda: open_phone_manager(gui_instance),
+            font=ctk.CTkFont(size=10, weight="bold"),
+            height=22,
+            width=115,
+            fg_color=("#34C759", "#30D158") if HAS_THEME else "#2e7d32",
+            hover_color=("#28a745", "#248a3d"),
+            text_color="#FFFFFF"
+        )
+        btn_phone.pack(side="left", padx=(8, 2))
+        CTkToolTip(btn_phone, "Manage and sort connected USB mobile phones & tablets (via ADB & Windows MTP)!")
 
     ctk.CTkLabel(dir_card, text="Target:", font=ctk.CTkFont(size=11, weight="bold")).grid(row=2, column=0, sticky="w", padx=(12, 6), pady=(0, 4))
 

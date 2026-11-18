@@ -7,26 +7,21 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Python Test Suite (Windows)
-    runs-on: windows-latest
-
+  build-and-test:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Install Python Dependencies
+      - name: Build Docker image
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          docker compose build
 
-      - name: Run Pytest Suite
+      - name: Run tests inside Docker
         run: |
-          pytest -v
+          docker compose up -d
+          docker compose exec app pytest -v
+          docker compose down
