@@ -880,6 +880,13 @@ if HAS_CUSTOMTKINTER:
                 self.selected_individual_files = []
                 self.set_target_dir(selected_dir)
 
+        def open_connected_devices(self):
+            try:
+                from gui_modules.device_selector import open_connected_devices_dialog
+                open_connected_devices_dialog(self)
+            except Exception as e:
+                messagebox.showerror("Device Manager Error", f"Failed to open Connected Devices dialog: {e}")
+
         # --- CONVERTER HANDLERS ---
         def browse_conv_folder(self):
             folder = filedialog.askdirectory(title="Select Folder Containing Files to Convert")

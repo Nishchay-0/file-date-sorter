@@ -27,6 +27,12 @@ try:
 except ImportError:
     HAS_PHONE_DIALOG = False
 
+try:
+    from gui_modules.device_selector import open_connected_devices_dialog, show_devices_dropdown_menu
+    HAS_DEVICE_SELECTOR = True
+except ImportError:
+    HAS_DEVICE_SELECTOR = False
+
 
 def setup_organizer_tab(gui_instance):
     scroll = ctk.CTkScrollableFrame(gui_instance.tab_organizer, fg_color="transparent")
@@ -105,6 +111,21 @@ def setup_organizer_tab(gui_instance):
         btn_phone.pack(side="left", padx=(8, 2))
         CTkToolTip(btn_phone, "Manage and sort connected USB mobile phones & tablets (via ADB & Windows MTP)!")
 
+    if HAS_DEVICE_SELECTOR:
+        btn_devices = ctk.CTkButton(
+            quick_frame,
+            text="🔌 Connected Devices...",
+            command=lambda: open_connected_devices_dialog(gui_instance),
+            font=ctk.CTkFont(size=10, weight="bold"),
+            height=22,
+            width=140,
+            fg_color=("#007AFF", "#0A84FF") if HAS_THEME else "#0288d1",
+            hover_color=("#0062cc", "#0071e3"),
+            text_color="#FFFFFF"
+        )
+        btn_devices.pack(side="left", padx=(6, 2))
+        CTkToolTip(btn_devices, "View and select files, folders, or drives from USB storage, SD cards, and mobile phones!")
+
     ctk.CTkLabel(dir_card, text="Target:", font=ctk.CTkFont(size=11, weight="bold")).grid(row=2, column=0, sticky="w", padx=(12, 6), pady=(0, 4))
 
     gui_instance.dir_var = tk.StringVar()
@@ -125,6 +146,20 @@ def setup_organizer_tab(gui_instance):
     gui_instance.browse_files_btn = ctk.CTkButton(btn_box, text="📄 Pick Files...", command=gui_instance.browse_individual_files, font=ctk.CTkFont(size=10, weight="bold"), fg_color=("#32ADE6", "#64D2FF") if HAS_THEME else "#00838f", height=32, width=90)
     gui_instance.browse_files_btn.pack(side="left", padx=(0, 3))
     CTkToolTip(gui_instance.browse_files_btn, "Select specific individual files anywhere on your computer!")
+
+    if HAS_DEVICE_SELECTOR:
+        gui_instance.browse_device_btn = ctk.CTkButton(
+            btn_box,
+            text="🔌 Devices ▾",
+            command=lambda: show_devices_dropdown_menu(gui_instance, gui_instance.browse_device_btn),
+            font=ctk.CTkFont(size=10, weight="bold"),
+            fg_color=("#AF52DE", "#BF5AF2") if HAS_THEME else "#7b1fa2",
+            hover_color=("#953bbd", "#a845db"),
+            height=32,
+            width=90
+        )
+        gui_instance.browse_device_btn.pack(side="left", padx=(0, 3))
+        CTkToolTip(gui_instance.browse_device_btn, "Quick-select files or folders directly from any connected USB drive, SD card, or phone!")
 
     gui_instance.open_folder_btn = ctk.CTkButton(
         btn_box, text="Open ↗", command=gui_instance.open_target_folder,

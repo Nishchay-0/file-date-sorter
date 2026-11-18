@@ -19,23 +19,25 @@
 | 2026-11-18 | **Pixel-Perfect Sidebar UI Overhaul**: refactored `gui_modules/sidebar.py` to use two-component `SidebarNavButton` with fixed 28px icon cells and uniform 42px text alignment; replaced non-standard arrows with universal Latin-1 `«` / `»` glyphs; recompiled single-file executable `dist/SmartFileOrganizer.exe` (117.6 MB) | Permanently resolves glyph drift and spacing gaps |
 | 2026-11-18 | **Repository Cleanup**: removed experimental scaffolding to preserve pure, professional Python desktop application architecture | Passed test suite (84 tests verified) |
 
+| 2026-11-18 | **Connected Devices & External Storage Selector**: implemented cross-platform drive & device detection in `device_bridge.py` (`StorageDriveInfo`, `scan_system_storage_drives`, `scan_all_connected_devices`); created `gui_modules/device_selector.py` with `ConnectedDevicesDialog` and quick dropdown `show_devices_dropdown_menu`; added `[🔌 Connected Devices...]` shortcut button and `[🔌 Devices ▾]` menu button to Target row in `tab_sorter.py`; verified seamless folder/file target sync across all app tabs (Date sorter, Duplicates, People, Extractor, Renamer, Cleaner, Analytics) | Added 3 unit tests in `tests/test_device_bridge.py` (10/10 passed) |
+
 ## In Progress
 
-- None — all changes tested and verified.
+- None — all file changes implemented, tested, and verified. Awaiting user command to compile `.exe`.
 
 ## Planned
 
+- Compile standalone executable with PyInstaller when instructed by user
 - Verify all tests pass in CI
 - Tag release `v1.0.2` after CI green
-- `onnxruntime` wheel for Python 3.15 — track release; re-enable face-sort tests when available
 
 ## Handoff Note (2026-11-18 session)
 
 **What changed:** 
-1. Fixed sidebar text alignment by decoupling icon and text widgets inside `SidebarNavButton`. Icon sits in a fixed 28px box centered; text begins at guaranteed 42px offset. Replaced toggle icon with Latin-1 `«` / `»` to eliminate missing glyph boxes.
-2. Built and integrated USB Phone Manager (`device_bridge.py`, `scripts/mtp_operations.ps1`, `gui_modules/phone_dialog.py`) with support for ADB in-place phone sorting and MTP/WPD import & date organization.
-3. Added shortcut button `[📱 Phone (USB)...]` to the Organizer tab in `tab_sorter.py`.
-4. Recompiled standalone portable `dist/SmartFileOrganizer.exe` (117.6 MB).
-5. Cleaned up experimental mobile scaffolds, keeping repo pure and professional. Verified test suite with 84 tests.
+1. Added full Connected Devices & Storage Selector (`device_bridge.py`, `gui_modules/device_selector.py`, `gui_modules/views/tab_sorter.py`, `gui_modules/app.py`).
+2. Supports scanning USB flash drives, external HDDs/SSDs, SD cards, network shares, and mobile phones (ADB & MTP).
+3. Added quick dropdown menu `[🔌 Devices ▾]` on the Target selection bar and `[🔌 Connected Devices...]` on the shortcuts bar, allowing users to pick folders, files, or entire drives with 1-click. Target synchronizes seamlessly to all app tabs.
+4. Added 3 new unit tests to `tests/test_device_bridge.py` (all 10 passed).
+5. Exe compilation held off as instructed by user until explicitly requested.
 
-**What's left:** None. Ready for production use.
+**What's left:** Build the `.exe` file whenever the user requests.

@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import shutil
+import string
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
@@ -34,6 +35,23 @@ class DeviceType(Enum):
 
 
 @dataclass
+class StorageDriveInfo:
+    """Represents a mounted physical, removable USB, or network storage volume."""
+    letter: str
+    path: str
+    label: str
+    drive_type: str  # 'removable', 'fixed', 'network', 'cdrom', 'unknown'
+    type_desc: str   # 'USB / Removable Drive', 'Local Disk', 'Network Share', etc.
+    free_bytes: int
+    total_bytes: int
+    free_str: str    # e.g. "14.8 GB free of 32.0 GB"
+    is_removable: bool
+
+    def to_dict(self):
+        return asdict(self)
+
+
+@dataclass
 class DeviceInfo:
     id: str  # Serial for ADB, Path or Name for MTP
     name: str  # Human readable friendly name (e.g. "Google Pixel 7")
@@ -46,6 +64,172 @@ class DeviceInfo:
         d = asdict(self)
         d["type"] = self.type.value
         return d
+
+
+def scan_system_storage_drives(only_removable: bool = False) -> List[StorageDriveInfo]:
+    """
+    Cross-platform scanner for all mounted physical, removable USB, and network storage drives.
+    On Windows: uses kernel32 GetLogicalDrives, GetDriveTypeW, GetVolumeInformationW.
+    On macOS: scans /Volumes/*
+    On Linux: parses /media, /mnt, /run/media.
+    """
+    drives: List[StorageDriveInfo] = []
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+            type_map = {
+                2: ("removable", "USB / Removable Drive"),
+                3: ("fixed", "Local / External Disk"),
+                4: ("network", "Network Share"),
+                5: ("cdrom", "CD/DVD Drive"),
+                6: ("ramdisk", "RAM Disk"),
+            }
+            for letter in string.ascii_uppercase:
+                if bitmask & 1:
+                    root = f"{letter}:\\"
+                    code = ctypes.windll.kernel32.GetDriveTypeW(root)
+                    dtype, desc = type_map.get(code, ("unknown", "Storage Drive"))
+                    is_rem = code in (2, 4)
+
+                    if only_removable and not is_rem:
+                        bitmask >>= 1
+                        continue
+
+                    vol_buf = ctypes.create_unicode_buffer(1024)
+                    fs_buf = ctypes.create_unicode_buffer(1024)
+                    try:
+                        ctypes.windll.kernel32.GetVolumeInformationW(
+                            root, vol_buf, 1024, None, None, None, fs_buf, 1024
+                        )
+                        label = vol_buf.value or f"Drive ({letter}:)"
+                    except Exception:
+                        label = f"Drive ({letter}:)"
+
+                    try:
+                        usage = shutil.disk_usage(root)
+                        fb = usage.free
+                        tb = usage.total
+                        free_gb = fb / (1024**3)
+                        tot_gb = tb / (1024**3)
+                        free_str = f"{free_gb:.1f} GB free of {tot_gb:.1f} GB"
+                    except Exception:
+                        fb = 0
+                        tb = 0
+                        free_str = "Ready"
+
+                    drives.append(
+                        StorageDriveInfo(
+                            letter=letter,
+                            path=root,
+                            label=label,
+                            drive_type=dtype,
+                            type_desc=desc,
+                            free_bytes=fb,
+                            total_bytes=tb,
+                            free_str=free_str,
+                            is_removable=is_rem,
+                        )
+                    )
+                bitmask >>= 1
+        except Exception as e:
+            logger.warning(f"Error scanning Windows drives: {e}")
+
+    elif sys.platform == "darwin":
+        # macOS /Volumes scanner
+        vol_root = "/Volumes"
+        if os.path.exists(vol_root):
+            try:
+                for entry in sorted(os.listdir(vol_root)):
+                    full = os.path.join(vol_root, entry)
+                    if os.path.ismount(full):
+                        is_rem = entry.lower() not in ("macintosh hd", "system")
+                        if only_removable and not is_rem:
+                            continue
+                        try:
+                            usage = shutil.disk_usage(full)
+                            free_str = f"{usage.free / (1024**3):.1f} GB free of {usage.total / (1024**3):.1f} GB"
+                            fb, tb = usage.free, usage.total
+                        except Exception:
+                            fb, tb = 0, 0
+                            free_str = "Mounted"
+                        drives.append(
+                            StorageDriveInfo(
+                                letter="",
+                                path=full,
+                                label=entry,
+                                drive_type="removable" if is_rem else "fixed",
+                                type_desc="USB / External Volume" if is_rem else "System Volume",
+                                free_bytes=fb,
+                                total_bytes=tb,
+                                free_str=free_str,
+                                is_removable=is_rem,
+                            )
+                        )
+            except Exception as e:
+                logger.warning(f"Error scanning macOS volumes: {e}")
+
+    elif sys.platform.startswith("linux"):
+        # Linux /media and /mnt scanner
+        candidates = ["/media", "/mnt", "/run/media"]
+        user = os.environ.get("USER") or os.environ.get("LOGNAME")
+        if user:
+            candidates.extend([f"/media/{user}", f"/run/media/{user}"])
+
+        seen_paths = set()
+        for base in candidates:
+            if os.path.exists(base):
+                try:
+                    for entry in os.listdir(base):
+                        full = os.path.join(base, entry)
+                        if os.path.isdir(full) and full not in seen_paths:
+                            seen_paths.add(full)
+                            try:
+                                usage = shutil.disk_usage(full)
+                                free_str = f"{usage.free / (1024**3):.1f} GB free of {usage.total / (1024**3):.1f} GB"
+                                fb, tb = usage.free, usage.total
+                            except Exception:
+                                fb, tb = 0, 0
+                                free_str = "Mounted"
+                            drives.append(
+                                StorageDriveInfo(
+                                    letter="",
+                                    path=full,
+                                    label=entry,
+                                    drive_type="removable",
+                                    type_desc="Removable Storage",
+                                    free_bytes=fb,
+                                    total_bytes=tb,
+                                    free_str=free_str,
+                                    is_removable=True,
+                                )
+                            )
+                except Exception:
+                    pass
+
+        # Also add root system disk if not only_removable
+        if not only_removable and "/" not in seen_paths:
+            try:
+                usage = shutil.disk_usage("/")
+                free_str = f"{usage.free / (1024**3):.1f} GB free of {usage.total / (1024**3):.1f} GB"
+                drives.append(
+                    StorageDriveInfo(
+                        letter="",
+                        path="/",
+                        label="Root Filesystem",
+                        drive_type="fixed",
+                        type_desc="Local Linux Disk",
+                        free_bytes=usage.free,
+                        total_bytes=usage.total,
+                        free_str=free_str,
+                        is_removable=False,
+                    )
+                )
+            except Exception:
+                pass
+
+    return drives
 
 
 class AdbBridge:
@@ -374,6 +558,35 @@ class UnifiedDeviceManager:
                 results.append(md)
 
         return results
+
+    def scan_storage_drives(self, only_removable: bool = False) -> List[StorageDriveInfo]:
+        """
+        Scans all mounted storage drives (USB flash drives, external HDDs/SSDs, SD cards, network shares).
+        """
+        return scan_system_storage_drives(only_removable=only_removable)
+
+    def scan_all_connected_devices(self) -> Dict[str, Any]:
+        """
+        Comprehensive scan of all connected devices across USB, Mobile (ADB/MTP), and storage drives.
+        Returns:
+            {
+                "phones": List[DeviceInfo],
+                "removable_drives": List[StorageDriveInfo],
+                "fixed_drives": List[StorageDriveInfo],
+                "total_count": int
+            }
+        """
+        phones = self.scan_all_devices()
+        drives = self.scan_storage_drives(only_removable=False)
+        removable = [d for d in drives if d.is_removable]
+        fixed = [d for d in drives if not d.is_removable]
+
+        return {
+            "phones": phones,
+            "removable_drives": removable,
+            "fixed_drives": fixed,
+            "total_count": len(phones) + len(removable) + len(fixed),
+        }
 
     def organize_phone_folder_adb(
         self,

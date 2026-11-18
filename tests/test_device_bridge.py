@@ -7,7 +7,15 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from device_bridge import AdbBridge, DeviceInfo, DeviceType, MtpBridge, UnifiedDeviceManager
+from device_bridge import (
+    AdbBridge,
+    DeviceInfo,
+    DeviceType,
+    MtpBridge,
+    StorageDriveInfo,
+    UnifiedDeviceManager,
+    scan_system_storage_drives,
+)
 
 
 class TestDeviceBridge(unittest.TestCase):
@@ -116,6 +124,43 @@ class TestDeviceBridge(unittest.TestCase):
         # Scan should execute without crashing and return a list
         devs = mgr.scan_all_devices()
         self.assertIsInstance(devs, list)
+
+    def test_08_storage_drive_info_dataclass(self):
+        s = StorageDriveInfo(
+            letter="E",
+            path="E:\\",
+            label="SanDisk USB",
+            drive_type="removable",
+            type_desc="USB / Removable Drive",
+            free_bytes=16000000000,
+            total_bytes=32000000000,
+            free_str="14.9 GB free of 29.8 GB",
+            is_removable=True,
+        )
+        d = s.to_dict()
+        self.assertEqual(d["letter"], "E")
+        self.assertEqual(d["drive_type"], "removable")
+        self.assertTrue(d["is_removable"])
+        self.assertIn("SanDisk", d["label"])
+
+    def test_09_scan_storage_drives(self):
+        drives = scan_system_storage_drives()
+        self.assertIsInstance(drives, list)
+        self.assertGreater(len(drives), 0)
+        # Check first drive attributes
+        first = drives[0]
+        self.assertIsInstance(first.path, str)
+        self.assertIsInstance(first.label, str)
+        self.assertIsInstance(first.free_str, str)
+
+    def test_10_scan_all_connected_devices(self):
+        mgr = UnifiedDeviceManager()
+        res = mgr.scan_all_connected_devices()
+        self.assertIn("phones", res)
+        self.assertIn("removable_drives", res)
+        self.assertIn("fixed_drives", res)
+        self.assertIn("total_count", res)
+        self.assertGreaterEqual(res["total_count"], 1)
 
 
 if __name__ == "__main__":
